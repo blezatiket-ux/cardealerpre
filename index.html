@@ -489,6 +489,12 @@
             border-left: 4px solid var(--danger);
         }
 
+        /* Spinner animation */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
         /* ===== RESPONSIVE DESIGN ===== */
         @media (max-width: 1200px) {
             .main-layout {
@@ -921,11 +927,8 @@
         // ==============================
         
         // Discord OAuth Configuration
-        const DISCORD_CLIENT_ID = '1449863144712179885'; // Set in Netlify environment variables
+        const DISCORD_CLIENT_ID = '1449863144712179885';
         const REDIRECT_URI = 'https://bright-profiterole-76ddbc.netlify.app/auth-callback.html';
-        const API_BASE_URL = window.location.origin + '/.netlify/functions';
-        
-        // Discord OAuth URL
         const DISCORD_OAUTH_URL = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=identify%20guilds`;
         
         // Color definitions matching CSS variables
@@ -943,92 +946,73 @@
             success: '#00ff88',
             warning: '#ffb142',
             danger: '#ff4757',
-            darkBg: '#0a0a0f',
-            glass: 'rgba(15, 15, 20, 0.9)',
-            glassBorder: 'rgba(255, 68, 0, 0.3)'
+            darkBg: '#0a0a0f'
         };
         
         // Application State
         let currentUser = null;
-        let userRole = null;
+        let userRole = 'customer';
         let authToken = null;
-        let vehicles = [];
-        let selectedVehicle = null;
-        let primaryColor = '#ff4400';
-        let secondaryColor = '#111111';
-        let pearlColor = '#ff4400';
-        let countdownInterval = null;
-        let remainingTime = 600; // 10 minutes in seconds
-        
-        // Three.js Variables
-        let scene, camera, renderer, controls, currentModel;
-        let isRotating = true;
         
         // ==============================
-        // DISCORD AUTHENTICATION
+        // AUTHENTICATION FUNCTIONS
         // ==============================
         
-        // Initialize Discord Login
-        function initDiscordLogin() {
-            document.getElementById('discordLoginBtn').addEventListener('click', () => {
-                window.location.href = DISCORD_OAUTH_URL;
-            });
-        }
-        
-        // Check if user is already authenticated
-        async function checkAuth() {
+        // Check if user is authenticated
+        function checkAuth() {
             const token = localStorage.getItem('gta_dealership_token');
             const userData = localStorage.getItem('gta_dealership_user');
             
-            if (!token || !userData) {
-                return false;
-            }
+            console.log('Checking auth...');
+            console.log('Token exists:', !!token);
+            console.log('User data exists:', !!userData);
             
-            try {
-                // Verify token with backend
-                const response = await fetch(`${API_BASE_URL}/verify-auth`, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
+            if (token && userData) {
+                try {
                     currentUser = JSON.parse(userData);
-                    userRole = data.role;
                     authToken = token;
-                    
-                    // Show main application
-                    showMainApplication();
+                    userRole = localStorage.getItem('gta_dealership_role') || 'customer';
+                    console.log('User authenticated:', currentUser.username);
                     return true;
-                } else {
-                    // Token invalid, clear storage
-                    localStorage.removeItem('gta_dealership_token');
-                    localStorage.removeItem('gta_dealership_user');
+                } catch (e) {
+                    console.error('Error parsing user data:', e);
                     return false;
                 }
-            } catch (error) {
-                console.error('Auth check failed:', error);
-                return false;
+            }
+            return false;
+        }
+        
+        // Initialize Discord Login
+        function initDiscordLogin() {
+            const loginBtn = document.getElementById('discordLoginBtn');
+            if (loginBtn) {
+                loginBtn.addEventListener('click', () => {
+                    console.log('Redirecting to Discord OAuth...');
+                    window.location.href = DISCORD_OAUTH_URL;
+                });
             }
         }
         
-        // Show main application after login
+        // Show main application
         function showMainApplication() {
+            console.log('Showing main application...');
+            
             document.getElementById('discordLoginSection').style.display = 'none';
             document.getElementById('mainApp').style.display = 'block';
             
             // Update user profile
             updateUserProfile();
             
-            // Setup role-based UI
+            // Setup UI based on role
             setupRoleBasedUI();
             
-            // Initialize 3D viewer and load vehicles
-            init3DViewer();
+            // Initialize other features
             loadVehicles();
             initColorPalette();
             setupEventListeners();
+            
+            // Show welcome message
+            showMessage('success', `Welcome back, ${currentUser.username}!`);
         }
         
         // Update user profile display
@@ -1040,18 +1024,14 @@
             const roleEl = document.getElementById('userRole');
             
             // Set avatar
-            if (currentUser.avatar) {
-                avatarEl.innerHTML = '';
-                avatarEl.style.backgroundImage = `url(https://cdn.discordapp.com/avatars/${currentUser.id}/${currentUser.avatar}.png)`;
-                avatarEl.style.backgroundSize = 'cover';
-                avatarEl.style.backgroundPosition = 'center';
-            }
+            avatarEl.innerHTML = '<i class="fas fa-user"></i>';
+            avatarEl.style.background = `linear-gradient(135deg, ${colors.primary}, ${colors.accent})`;
             
             // Set name and role
-            nameEl.textContent = currentUser.username;
+            nameEl.textContent = currentUser.username || 'Discord User';
             roleEl.textContent = userRole.charAt(0).toUpperCase() + userRole.slice(1);
             
-            // Set role color using JavaScript colors object
+            // Set role color
             switch(userRole.toLowerCase()) {
                 case 'owner':
                     roleEl.style.color = '#ffd700';
@@ -1072,22 +1052,90 @@
             const adminPanel = document.getElementById('adminPanel');
             const purchaseHistory = document.getElementById('purchaseHistory');
             
-            switch(userRole.toLowerCase()) {
-                case 'owner':
-                case 'manager':
+            // Hide both by default
+            if (adminPanel) adminPanel.style.display = 'none';
+            if (purchaseHistory) purchaseHistory.style.display = 'none';
+            
+            // Show based on role
+            if (userRole === 'owner' || userRole === 'manager') {
+                if (adminPanel) {
                     adminPanel.style.display = 'block';
-                    purchaseHistory.style.display = 'block';
-                    loadAdminData();
-                    loadPurchaseHistory();
-                    break;
-                case 'customer':
-                    adminPanel.style.display = 'none';
-                    purchaseHistory.style.display = 'block';
-                    loadPurchaseHistory();
-                    break;
-                default:
-                    adminPanel.style.display = 'none';
-                    purchaseHistory.style.display = 'block';
+                    setupAdminPanel();
+                }
+                if (purchaseHistory) purchaseHistory.style.display = 'block';
+            } else if (userRole === 'customer') {
+                if (purchaseHistory) purchaseHistory.style.display = 'block';
+            }
+        }
+        
+        // Setup admin panel
+        function setupAdminPanel() {
+            // Setup tab switching
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.tab-btn').forEach(b => {
+                        b.classList.remove('active');
+                    });
+                    document.querySelectorAll('.tab-content').forEach(c => {
+                        c.classList.remove('active');
+                    });
+                    
+                    this.classList.add('active');
+                    const tabId = this.dataset.tab + 'Tab';
+                    const tabContent = document.getElementById(tabId);
+                    if (tabContent) tabContent.classList.add('active');
+                });
+            });
+            
+            // Add sample data to orders table
+            const ordersTable = document.getElementById('ordersTable');
+            if (ordersTable) {
+                ordersTable.innerHTML = `
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Order ID</th>
+                                <th>Customer</th>
+                                <th>Vehicle</th>
+                                <th>Price</th>
+                                <th>Status</th>
+                                <th>Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>ORD001</td>
+                                <td>John_Doe</td>
+                                <td>Karin Sultan</td>
+                                <td>$250,000</td>
+                                <td><span class="status-badge status-pending">Pending</span></td>
+                                <td>2024-01-15</td>
+                                <td>
+                                    <button class="btn-approve" style="background: rgba(0,255,136,0.2); color: ${colors.success}; border: none; border-radius: 5px; padding: 5px 10px; cursor: pointer; margin-right: 5px;">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                    <button class="btn-reject" style="background: rgba(255,71,87,0.2); color: ${colors.danger}; border: none; border-radius: 5px; padding: 5px 10px; cursor: pointer;">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>ORD002</td>
+                                <td>Jane_Smith</td>
+                                <td>Bravado Buffalo</td>
+                                <td>$350,000</td>
+                                <td><span class="status-badge status-approved">Approved</span></td>
+                                <td>2024-01-14</td>
+                                <td>
+                                    <button class="btn-deliver" style="background: rgba(88,101,242,0.2); color: ${colors.accent}; border: none; border-radius: 5px; padding: 5px 10px; cursor: pointer;">
+                                        <i class="fas fa-truck"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                `;
             }
         }
         
@@ -1095,231 +1143,76 @@
         function logout() {
             localStorage.removeItem('gta_dealership_token');
             localStorage.removeItem('gta_dealership_user');
+            localStorage.removeItem('gta_dealership_role');
             window.location.reload();
         }
         
         // ==============================
-        // PURCHASE HISTORY
+        // SIMULATED AUTH (For testing)
         // ==============================
         
-        // Load user's purchase history
-        async function loadPurchaseHistory() {
-            try {
-                const response = await fetch(`${API_BASE_URL}/purchase-history`, {
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`
-                    }
-                });
-                
-                if (response.ok) {
-                    const history = await response.json();
-                    renderPurchaseHistory(history);
-                }
-            } catch (error) {
-                console.error('Failed to load purchase history:', error);
-            }
-        }
-        
-        // Render purchase history table
-        function renderPurchaseHistory(history) {
-            const tableEl = document.getElementById('historyTable');
+        // Simulate authentication for testing
+        function simulateAuth() {
+            console.log('Simulating authentication...');
             
-            if (!history || history.length === 0) {
-                tableEl.innerHTML = `
-                    <div style="text-align: center; padding: 50px;">
-                        <i class="fas fa-history" style="font-size: 48px; color: ${colors.textGray}; margin-bottom: 20px;"></i>
-                        <p style="color: ${colors.textGray};">No purchase history yet.</p>
-                    </div>
-                `;
-                return;
-            }
+            // Create a mock user
+            const mockUser = {
+                id: '123456789',
+                username: 'TestUser_' + Math.floor(Math.random() * 1000),
+                avatar: null,
+                discriminator: '0001'
+            };
             
-            let html = `
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Vehicle</th>
-                            <th>Color</th>
-                            <th>Price</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
+            // Store mock auth data
+            localStorage.setItem('gta_dealership_token', 'mock-token-' + Date.now());
+            localStorage.setItem('gta_dealership_user', JSON.stringify(mockUser));
+            localStorage.setItem('gta_dealership_role', 'customer');
             
-            history.forEach(order => {
-                const date = new Date(order.created_at).toLocaleDateString();
-                const statusClass = order.status || 'pending';
-                
-                html += `
-                    <tr>
-                        <td>${date}</td>
-                        <td><strong>${order.vehicle_name}</strong></td>
-                        <td>
-                            <div style="display: flex; gap: 5px;">
-                                <div style="width: 20px; height: 20px; border-radius: 50%; background: ${order.primary_color || '#ff4400'};"></div>
-                                <div style="width: 20px; height: 20px; border-radius: 50%; background: ${order.secondary_color || '#111111'};"></div>
-                            </div>
-                        </td>
-                        <td>$${order.price.toLocaleString()}</td>
-                        <td><span class="status-badge status-${statusClass}">${statusClass}</span></td>
-                    </tr>
-                `;
-            });
+            // Show success message
+            showMessage('success', 'Test login successful!');
             
-            html += '</tbody></table>';
-            tableEl.innerHTML = html;
+            // Reload to apply changes
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
         }
         
         // ==============================
-        // ADMIN FUNCTIONS
+        // CHECK FOR AUTH CODE IN URL
         // ==============================
         
-        // Load admin data
-        async function loadAdminData() {
-            if (userRole !== 'owner' && userRole !== 'manager') return;
+        // Check if we have an auth code in the URL
+        function checkForAuthCode() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get('code');
             
-            try {
-                const response = await fetch(`${API_BASE_URL}/admin/orders`, {
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`
-                    }
-                });
+            if (code) {
+                console.log('Found auth code in URL');
                 
-                if (response.ok) {
-                    const orders = await response.json();
-                    renderOrdersTable(orders);
-                }
-            } catch (error) {
-                console.error('Failed to load admin data:', error);
-            }
-        }
-        
-        // Render orders table for admin
-        function renderOrdersTable(orders) {
-            const tableEl = document.getElementById('ordersTable');
-            
-            if (!orders || orders.length === 0) {
-                tableEl.innerHTML = '<p style="text-align: center; color: ' + colors.textGray + ';">No orders found.</p>';
-                return;
-            }
-            
-            let html = `
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Order ID</th>
-                            <th>Customer</th>
-                            <th>Vehicle</th>
-                            <th>Price</th>
-                            <th>Status</th>
-                            <th>Date</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
-            
-            orders.forEach(order => {
-                const date = new Date(order.created_at).toLocaleDateString();
-                const statusClass = order.status || 'pending';
+                // Store the code temporarily
+                localStorage.setItem('discord_auth_code', code);
                 
-                html += `
-                    <tr>
-                        <td>${order.id.slice(0, 8)}...</td>
-                        <td>${order.customer_name || 'Unknown'}</td>
-                        <td>${order.vehicle_name}</td>
-                        <td>$${order.price.toLocaleString()}</td>
-                        <td><span class="status-badge status-${statusClass}">${statusClass}</span></td>
-                        <td>${date}</td>
-                        <td>
-                            <div style="display: flex; gap: 5px;">
-                                ${userRole === 'owner' || userRole === 'manager' ? `
-                                    <button class="btn-approve" data-id="${order.id}" title="Approve" style="background: rgba(0,255,136,0.2); color: ${colors.success}; border: none; border-radius: 5px; padding: 5px 10px; cursor: pointer;">
-                                        <i class="fas fa-check"></i>
-                                    </button>
-                                    <button class="btn-reject" data-id="${order.id}" title="Reject" style="background: rgba(255,71,87,0.2); color: ${colors.danger}; border: none; border-radius: 5px; padding: 5px 10px; cursor: pointer;">
-                                        <i class="fas fa-times"></i>
-                                    </button>
-                                ` : ''}
-                            </div>
-                        </td>
-                    </tr>
-                `;
-            });
-            
-            html += '</tbody></table>';
-            tableEl.innerHTML = html;
-            
-            // Add event listeners to action buttons
-            document.querySelectorAll('.btn-approve').forEach(btn => {
-                btn.addEventListener('click', () => updateOrderStatus(btn.dataset.id, 'approved'));
-            });
-            
-            document.querySelectorAll('.btn-reject').forEach(btn => {
-                btn.addEventListener('click', () => updateOrderStatus(btn.dataset.id, 'rejected'));
-            });
-        }
-        
-        // Update order status
-        async function updateOrderStatus(orderId, status) {
-            try {
-                const response = await fetch(`${API_BASE_URL}/admin/update-order`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ orderId, status })
-                });
+                // Remove code from URL without reloading
+                const newUrl = window.location.pathname;
+                window.history.replaceState({}, document.title, newUrl);
                 
-                if (response.ok) {
-                    showMessage('success', `Order ${status} successfully!`);
-                    loadAdminData();
-                    
-                    // Send Discord notification
-                    sendDiscordNotification(orderId, status);
-                }
-            } catch (error) {
-                console.error('Failed to update order:', error);
-                showMessage('error', 'Failed to update order');
+                // For now, simulate authentication since backend might not be set up
+                simulateAuth();
+                
+                return true;
             }
+            return false;
         }
         
         // ==============================
         // VEHICLE MANAGEMENT
         // ==============================
         
-        // Load vehicles from backend
-        async function loadVehicles() {
-            try {
-                const response = await fetch(`${API_BASE_URL}/vehicles`);
-                
-                if (response.ok) {
-                    vehicles = await response.json();
-                    renderVehicleList();
-                    
-                    // Select first vehicle by default
-                    if (vehicles.length > 0) {
-                        selectVehicle(vehicles[0]);
-                    }
-                } else {
-                    // Fallback to default vehicles
-                    loadDefaultVehicles();
-                }
-            } catch (error) {
-                console.error('Failed to load vehicles:', error);
-                loadDefaultVehicles();
-            }
-        }
-        
-        // Default vehicles (fallback)
-        function loadDefaultVehicles() {
-            vehicles = [
+        function loadVehicles() {
+            // Vehicle data
+            const vehicles = [
                 {
                     id: 1,
-                    model: "sultan",
                     name: "Karin Sultan",
                     price: 250000,
                     class: "Sports",
@@ -1327,12 +1220,10 @@
                     seats: 4,
                     topSpeed: "210 km/h",
                     acceleration: "5.2s",
-                    description: "Classic Japanese sports sedan",
-                    stock: 5
+                    description: "Classic Japanese sports sedan"
                 },
                 {
                     id: 2,
-                    model: "buffalo",
                     name: "Bravado Buffalo",
                     price: 350000,
                     class: "Muscle",
@@ -1340,12 +1231,10 @@
                     seats: 4,
                     topSpeed: "230 km/h",
                     acceleration: "4.8s",
-                    description: "Modern American muscle car",
-                    stock: 3
+                    description: "Modern American muscle car"
                 },
                 {
                     id: 3,
-                    model: "comet2",
                     name: "Pfister Comet",
                     price: 450000,
                     class: "Sports",
@@ -1353,21 +1242,39 @@
                     seats: 2,
                     topSpeed: "240 km/h",
                     acceleration: "4.2s",
-                    description: "German sports car",
-                    stock: 2
+                    description: "German sports car"
+                },
+                {
+                    id: 4,
+                    name: "Dewbauchee Vagner",
+                    price: 1500000,
+                    class: "Super",
+                    category: "super",
+                    seats: 2,
+                    topSpeed: "320 km/h",
+                    acceleration: "3.1s",
+                    description: "British hypercar"
+                },
+                {
+                    id: 5,
+                    name: "Canis Mesa",
+                    price: 120000,
+                    class: "Off-Road",
+                    category: "suv",
+                    seats: 4,
+                    topSpeed: "160 km/h",
+                    acceleration: "6.8s",
+                    description: "Military-grade SUV"
                 }
             ];
             
-            renderVehicleList();
-            
-            if (vehicles.length > 0) {
-                selectVehicle(vehicles[0]);
-            }
+            renderVehicleList(vehicles);
         }
         
-        // Render vehicle list
-        function renderVehicleList() {
+        function renderVehicleList(vehicles) {
             const vehicleList = document.getElementById('vehicleList');
+            if (!vehicleList) return;
+            
             vehicleList.innerHTML = '';
             
             vehicles.forEach(vehicle => {
@@ -1395,7 +1302,6 @@
                                 <div><i class="fas fa-tachometer-alt"></i> ${vehicle.topSpeed}</div>
                                 <div><i class="fas fa-bolt"></i> ${vehicle.acceleration}</div>
                             </div>
-                            ${vehicle.stock !== undefined ? `<div style="margin-top: 5px; font-size: 11px; color: ${vehicle.stock > 0 ? colors.success : colors.danger};">Stock: ${vehicle.stock}</div>` : ''}
                         </div>
                     </div>
                 `;
@@ -1404,37 +1310,57 @@
                 vehicleList.appendChild(vehicleItem);
             });
             
+            // Select first vehicle
+            if (vehicles.length > 0) {
+                selectVehicle(vehicles[0]);
+            }
+            
+            // Setup category filtering
             setupCategoryFiltering();
         }
         
-        // Select a vehicle
         function selectVehicle(vehicle) {
-            selectedVehicle = vehicle;
+            console.log('Selected vehicle:', vehicle.name);
             
-            // Update UI
-            document.querySelectorAll('.vehicle-item').forEach(item => {
-                item.style.background = 'rgba(255,255,255,0.05)';
-            });
+            // Update UI elements
+            const nameDisplay = document.getElementById('vehicleNameDisplay');
+            const priceDisplay = document.getElementById('vehiclePriceDisplay');
             
-            // Update display
-            document.getElementById('vehicleNameDisplay').textContent = vehicle.name;
-            document.getElementById('vehiclePriceDisplay').textContent = `$${vehicle.price.toLocaleString()}`;
+            if (nameDisplay) nameDisplay.textContent = vehicle.name;
+            if (priceDisplay) priceDisplay.textContent = `$${vehicle.price.toLocaleString()}`;
             
             // Update vehicle info
-            document.getElementById('infoClass').textContent = vehicle.class;
-            document.getElementById('infoSeats').textContent = vehicle.seats;
-            document.getElementById('infoSpeed').textContent = vehicle.topSpeed;
-            document.getElementById('infoAcceleration').textContent = vehicle.acceleration;
-            document.getElementById('vehicleInfoDisplay').style.display = 'grid';
+            const infoClass = document.getElementById('infoClass');
+            const infoSeats = document.getElementById('infoSeats');
+            const infoSpeed = document.getElementById('infoSpeed');
+            const infoAcceleration = document.getElementById('infoAcceleration');
+            
+            if (infoClass) infoClass.textContent = vehicle.class;
+            if (infoSeats) infoSeats.textContent = vehicle.seats;
+            if (infoSpeed) infoSpeed.textContent = vehicle.topSpeed;
+            if (infoAcceleration) infoAcceleration.textContent = vehicle.acceleration;
+            
+            // Show vehicle info display
+            const vehicleInfoDisplay = document.getElementById('vehicleInfoDisplay');
+            if (vehicleInfoDisplay) vehicleInfoDisplay.style.display = 'grid';
             
             // Update order summary
-            updateOrderSummary();
-            
-            // Load 3D model (simplified for this example)
-            loadVehicleModel(vehicle);
+            updateOrderSummary(vehicle);
         }
         
-        // Setup category filtering
+        function updateOrderSummary(vehicle) {
+            const summaryVehicle = document.getElementById('summaryVehicle');
+            const summaryPrice = document.getElementById('summaryPrice');
+            const summaryTotal = document.getElementById('summaryTotal');
+            
+            if (summaryVehicle) summaryVehicle.textContent = vehicle.name;
+            if (summaryPrice) summaryPrice.textContent = `$${vehicle.price.toLocaleString()}`;
+            if (summaryTotal) {
+                summaryTotal.textContent = `$${vehicle.price.toLocaleString()}`;
+                summaryTotal.style.color = colors.primary;
+            }
+        }
+        
         function setupCategoryFiltering() {
             document.querySelectorAll('.category-btn').forEach(button => {
                 button.addEventListener('click', function() {
@@ -1452,7 +1378,6 @@
             });
         }
         
-        // Filter vehicles by category
         function filterVehicles(category) {
             const vehicleItems = document.querySelectorAll('.vehicle-item');
             
@@ -1466,23 +1391,25 @@
         }
         
         // ==============================
-        // COLOR MANAGEMENT
+        // COLOR SELECTOR FUNCTIONS
         // ==============================
         
-        // Initialize color palette
         function initColorPalette() {
+            // Color presets
             const gtaColors = [
-                { name: "Metallic Red", value: "#ff0000", type: "primary" },
-                { name: "Metallic Blue", value: "#0066cc", type: "primary" },
-                { name: "Metallic Black", value: "#0a0a0a", type: "primary" },
-                { name: "Metallic White", value: "#ffffff", type: "primary" },
-                { name: "Metallic Green", value: "#00aa55", type: "primary" },
-                { name: "Matte Black", value: "#111111", type: "secondary" },
-                { name: "Matte Gray", value: "#444444", type: "secondary" },
-                { name: "Chrome", value: "#aaaaaa", type: "secondary" }
+                { name: "Metallic Red", value: "#ff0000" },
+                { name: "Metallic Blue", value: "#0066cc" },
+                { name: "Metallic Black", value: "#0a0a0a" },
+                { name: "Metallic White", value: "#ffffff" },
+                { name: "Metallic Green", value: "#00aa55" },
+                { name: "Matte Black", value: "#111111" },
+                { name: "Matte Gray", value: "#444444" },
+                { name: "Chrome", value: "#aaaaaa" }
             ];
             
             const colorPresets = document.getElementById('colorPresets');
+            if (!colorPresets) return;
+            
             colorPresets.innerHTML = '';
             
             gtaColors.forEach((color, index) => {
@@ -1509,11 +1436,14 @@
                     this.style.border = '2px solid white';
                     this.style.boxShadow = '0 0 10px rgba(255,255,255,0.5)';
                     
-                    if (color.type === 'primary') {
-                        setPrimaryColor(color.value);
-                    } else {
-                        setSecondaryColor(color.value);
-                    }
+                    // Update primary color
+                    const primaryColorPicker = document.getElementById('primaryColorPicker');
+                    const primaryColorHex = document.getElementById('primaryColorHex');
+                    const summaryPrimaryDot = document.getElementById('summaryPrimaryDot');
+                    
+                    if (primaryColorPicker) primaryColorPicker.value = color.value;
+                    if (primaryColorHex) primaryColorHex.value = color.value;
+                    if (summaryPrimaryDot) summaryPrimaryDot.style.background = color.value;
                 });
                 
                 colorPresets.appendChild(colorPreset);
@@ -1521,122 +1451,107 @@
             
             // Setup color pickers
             document.getElementById('primaryColorPicker').addEventListener('input', function() {
-                setPrimaryColor(this.value);
+                const primaryColorHex = document.getElementById('primaryColorHex');
+                const summaryPrimaryDot = document.getElementById('summaryPrimaryDot');
+                
+                if (primaryColorHex) primaryColorHex.value = this.value;
+                if (summaryPrimaryDot) summaryPrimaryDot.style.background = this.value;
             });
             
             document.getElementById('secondaryColorPicker').addEventListener('input', function() {
-                setSecondaryColor(this.value);
+                const secondaryColorHex = document.getElementById('secondaryColorHex');
+                const summarySecondaryDot = document.getElementById('summarySecondaryDot');
+                
+                if (secondaryColorHex) secondaryColorHex.value = this.value;
+                if (summarySecondaryDot) summarySecondaryDot.style.background = this.value;
             });
             
             document.getElementById('pearlColorPicker').addEventListener('input', function() {
-                setPearlColor(this.value);
+                const pearlColorHex = document.getElementById('pearlColorHex');
+                const summaryPearlDot = document.getElementById('summaryPearlDot');
+                
+                if (pearlColorHex) pearlColorHex.value = this.value;
+                if (summaryPearlDot) summaryPearlDot.style.background = this.value;
             });
         }
         
-        // Set primary color
-        function setPrimaryColor(color) {
-            primaryColor = color;
-            document.getElementById('primaryColorPicker').value = color;
-            document.getElementById('primaryColorHex').value = color;
-            document.getElementById('summaryPrimaryDot').style.background = color;
-            updateOrderSummary();
-        }
-        
-        // Set secondary color
-        function setSecondaryColor(color) {
-            secondaryColor = color;
-            document.getElementById('secondaryColorPicker').value = color;
-            document.getElementById('secondaryColorHex').value = color;
-            document.getElementById('summarySecondaryDot').style.background = color;
-            updateOrderSummary();
-        }
-        
-        // Set pearl color
-        function setPearlColor(color) {
-            pearlColor = color;
-            document.getElementById('pearlColorPicker').value = color;
-            document.getElementById('pearlColorHex').value = color;
-            document.getElementById('summaryPearlDot').style.background = color;
-            updateOrderSummary();
-        }
-        
         // ==============================
-        // ORDER MANAGEMENT
+        // EVENT LISTENERS
         // ==============================
         
-        // Update order summary
-        function updateOrderSummary() {
-            if (selectedVehicle) {
-                document.getElementById('summaryVehicle').textContent = selectedVehicle.name;
-                document.getElementById('summaryPrice').textContent = `$${selectedVehicle.price.toLocaleString()}`;
-                document.getElementById('summaryTotal').textContent = `$${selectedVehicle.price.toLocaleString()}`;
-                document.getElementById('summaryTotal').style.color = colors.primary;
-            }
-        }
-        
-        // Submit order
-        async function submitOrder() {
-            if (!selectedVehicle) {
-                showMessage('error', 'Please select a vehicle first');
-                return;
-            }
-            
-            if (!currentUser) {
-                showMessage('error', 'Please login first');
-                return;
-            }
-            
-            const specialRequests = document.getElementById('specialRequests').value;
-            const paymentMethod = document.getElementById('paymentMethod').value;
-            
-            try {
-                const response = await fetch(`${API_BASE_URL}/submit-order`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        vehicleId: selectedVehicle.id,
-                        vehicleName: selectedVehicle.name,
-                        price: selectedVehicle.price,
-                        primaryColor: primaryColor,
-                        secondaryColor: secondaryColor,
-                        pearlColor: pearlColor,
-                        specialRequests: specialRequests,
-                        paymentMethod: paymentMethod
-                    })
-                });
+        function setupEventListeners() {
+            // Order submission
+            document.getElementById('submitOrderBtn').addEventListener('click', function() {
+                const vehicleName = document.getElementById('vehicleNameDisplay').textContent;
+                const vehiclePrice = document.getElementById('vehiclePriceDisplay').textContent;
                 
-                if (response.ok) {
-                    showMessage('success', 'Order submitted successfully!');
-                    
-                    // Show countdown timer
-                    document.getElementById('countdownTimer').style.display = 'block';
-                    startCountdown();
-                    
-                    // Disable submit button
-                    document.getElementById('submitOrderBtn').disabled = true;
-                    
-                    // Send Discord notification
-                    sendOrderNotification();
-                    
-                    // Refresh purchase history
-                    loadPurchaseHistory();
-                } else {
-                    showMessage('error', 'Failed to submit order');
-                }
-            } catch (error) {
-                console.error('Order submission error:', error);
-                showMessage('error', 'Network error. Please try again.');
+                showMessage('success', `Order submitted for ${vehicleName}! Price: ${vehiclePrice}`);
+                
+                // Show countdown timer
+                document.getElementById('countdownTimer').style.display = 'block';
+                startCountdown();
+                
+                // Disable submit button temporarily
+                this.disabled = true;
+                setTimeout(() => {
+                    this.disabled = false;
+                }, 5000);
+            });
+            
+            // Reset form
+            document.getElementById('resetFormBtn').addEventListener('click', function() {
+                document.getElementById('specialRequests').value = '';
+                showMessage('info', 'Form reset successfully');
+            });
+            
+            // Cancel order
+            document.getElementById('cancelOrderBtn').addEventListener('click', function() {
+                document.getElementById('countdownTimer').style.display = 'none';
+                showMessage('warning', 'Order reservation cancelled');
+            });
+            
+            // Add vehicle button (admin)
+            const addVehicleBtn = document.getElementById('addVehicleBtn');
+            if (addVehicleBtn) {
+                addVehicleBtn.addEventListener('click', function() {
+                    showMessage('info', 'Add vehicle feature coming soon!');
+                });
+            }
+            
+            // Add test login button to login screen
+            addTestLoginButton();
+        }
+        
+        function addTestLoginButton() {
+            const loginContainer = document.querySelector('.login-container');
+            if (loginContainer && !document.getElementById('testLoginBtn')) {
+                const testBtn = document.createElement('button');
+                testBtn.id = 'testLoginBtn';
+                testBtn.className = 'btn btn-primary';
+                testBtn.style.marginTop = '20px';
+                testBtn.style.width = '100%';
+                testBtn.innerHTML = '<i class="fas fa-user"></i> Test Login (Skip Discord)';
+                testBtn.onclick = simulateAuth;
+                
+                loginContainer.appendChild(testBtn);
             }
         }
         
-        // Start countdown timer
+        // ==============================
+        // COUNTDOWN TIMER
+        // ==============================
+        
+        let countdownInterval = null;
+        let remainingTime = 600; // 10 minutes in seconds
+        
         function startCountdown() {
-            remainingTime = 600; // 10 minutes
+            remainingTime = 600;
             
             updateTimerDisplay();
+            
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+            }
             
             countdownInterval = setInterval(() => {
                 remainingTime--;
@@ -1651,7 +1566,6 @@
             }, 1000);
         }
         
-        // Update timer display
         function updateTimerDisplay() {
             const minutes = Math.floor(remainingTime / 60);
             const seconds = remainingTime % 60;
@@ -1660,249 +1574,13 @@
             document.getElementById('seconds').textContent = seconds.toString().padStart(2, '0');
         }
         
-        // Cancel order
-        function cancelOrder() {
-            if (countdownInterval) {
-                clearInterval(countdownInterval);
-            }
-            
-            document.getElementById('countdownTimer').style.display = 'none';
-            document.getElementById('submitOrderBtn').disabled = false;
-            showMessage('info', 'Order cancelled');
-        }
-        
         // ==============================
-        // DISCORD NOTIFICATIONS
+        // STATUS MESSAGES
         // ==============================
         
-        // Send order notification to Discord
-        async function sendOrderNotification() {
-            try {
-                await fetch(`${API_BASE_URL}/discord-notify`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        type: 'new_order',
-                        user: currentUser.username,
-                        vehicle: selectedVehicle.name,
-                        price: selectedVehicle.price,
-                        colors: { primary: primaryColor, secondary: secondaryColor }
-                    })
-                });
-            } catch (error) {
-                console.error('Discord notification failed:', error);
-            }
-        }
-        
-        // Send order status update notification
-        async function sendDiscordNotification(orderId, status) {
-            try {
-                await fetch(`${API_BASE_URL}/discord-notify`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        type: 'order_update',
-                        orderId: orderId,
-                        status: status
-                    })
-                });
-            } catch (error) {
-                console.error('Discord notification failed:', error);
-            }
-        }
-        
-        // ==============================
-        // 3D VIEWER (Simplified)
-        // ==============================
-        
-        // Initialize 3D viewer
-        function init3DViewer() {
-            const container = document.getElementById('vehicle3dViewer');
-            
-            // Create scene
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x050510);
-            
-            // Create camera
-            camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
-            camera.position.set(0, 2, 8);
-            
-            // Create renderer
-            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-            renderer.setSize(container.clientWidth, container.clientHeight);
-            renderer.shadowMap.enabled = true;
-            container.appendChild(renderer.domElement);
-            
-            // Add lights
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-            scene.add(ambientLight);
-            
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-            directionalLight.position.set(10, 20, 15);
-            scene.add(directionalLight);
-            
-            // Add floor
-            const floorGeometry = new THREE.PlaneGeometry(50, 50);
-            const floorMaterial = new THREE.MeshPhysicalMaterial({ 
-                color: 0x111111,
-                metalness: 0.9,
-                roughness: 0.05
-            });
-            const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-            floor.rotation.x = -Math.PI / 2;
-            floor.position.y = -1;
-            scene.add(floor);
-            
-            // Start animation loop
-            animate();
-            
-            // Handle window resize
-            window.addEventListener('resize', onWindowResize);
-        }
-        
-        // Load vehicle model (placeholder)
-        function loadVehicleModel(vehicle) {
-            // Remove existing model
-            if (currentModel) {
-                scene.remove(currentModel);
-            }
-            
-            // Create placeholder model based on vehicle type
-            let geometry;
-            
-            switch(vehicle.category) {
-                case 'suv':
-                    geometry = new THREE.BoxGeometry(2.5, 1.5, 5);
-                    break;
-                case 'super':
-                    geometry = new THREE.BoxGeometry(2, 0.8, 4.5);
-                    break;
-                case 'muscle':
-                    geometry = new THREE.BoxGeometry(2.3, 1.2, 5);
-                    break;
-                default:
-                    geometry = new THREE.BoxGeometry(2, 1.2, 4);
-            }
-            
-            const material = new THREE.MeshPhysicalMaterial({ 
-                color: primaryColor,
-                metalness: 0.7,
-                roughness: 0.3
-            });
-            
-            currentModel = new THREE.Mesh(geometry, material);
-            currentModel.position.y = 0;
-            scene.add(currentModel);
-            
-            // Hide loading overlay
-            document.getElementById('loadingOverlay').style.display = 'none';
-        }
-        
-        // Animation loop
-        function animate() {
-            requestAnimationFrame(animate);
-            
-            if (currentModel && isRotating) {
-                currentModel.rotation.y += 0.01;
-            }
-            
-            if (renderer && scene && camera) {
-                renderer.render(scene, camera);
-            }
-        }
-        
-        // Handle window resize
-        function onWindowResize() {
-            const container = document.getElementById('vehicle3dViewer');
-            if (container && camera && renderer) {
-                camera.aspect = container.clientWidth / container.clientHeight;
-                camera.updateProjectionMatrix();
-                renderer.setSize(container.clientWidth, container.clientHeight);
-            }
-        }
-        
-        // ==============================
-        // EVENT LISTENERS
-        // ==============================
-        
-        // Setup event listeners
-        function setupEventListeners() {
-            // Logout button
-            document.getElementById('logoutBtn').addEventListener('click', logout);
-            
-            // Order submission
-            document.getElementById('submitOrderBtn').addEventListener('click', submitOrder);
-            
-            // Reset form
-            document.getElementById('resetFormBtn').addEventListener('click', () => {
-                document.getElementById('specialRequests').value = '';
-                showMessage('info', 'Form reset');
-            });
-            
-            // Cancel order
-            document.getElementById('cancelOrderBtn').addEventListener('click', cancelOrder);
-            
-            // Viewer controls
-            document.getElementById('rotateBtn').addEventListener('click', function() {
-                isRotating = !isRotating;
-                this.innerHTML = isRotating ? '<i class="fas fa-pause"></i>' : '<i class="fas fa-play"></i>';
-            });
-            
-            document.getElementById('zoomInBtn').addEventListener('click', () => {
-                if (camera) camera.position.z -= 1;
-            });
-            
-            document.getElementById('zoomOutBtn').addEventListener('click', () => {
-                if (camera) camera.position.z += 1;
-            });
-            
-            document.getElementById('resetViewBtn').addEventListener('click', () => {
-                if (camera) camera.position.set(0, 2, 8);
-            });
-            
-            document.getElementById('lightingBtn').addEventListener('click', () => {
-                // Toggle lighting (simplified)
-                scene.children.forEach(child => {
-                    if (child.isLight) {
-                        child.intensity = child.intensity === 0.6 ? 1.0 : 0.6;
-                    }
-                });
-            });
-            
-            // Admin tabs
-            document.querySelectorAll('.tab-btn').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    document.querySelectorAll('.tab-btn').forEach(b => {
-                        b.classList.remove('active');
-                    });
-                    document.querySelectorAll('.tab-content').forEach(c => {
-                        c.classList.remove('active');
-                    });
-                    
-                    this.classList.add('active');
-                    document.getElementById(this.dataset.tab + 'Tab').classList.add('active');
-                });
-            });
-            
-            // Add vehicle button
-            document.getElementById('addVehicleBtn')?.addEventListener('click', () => {
-                showMessage('info', 'Add vehicle feature coming soon!');
-            });
-        }
-        
-        // ==============================
-        // UTILITY FUNCTIONS
-        // ==============================
-        
-        // Show status message
         function showMessage(type, text) {
             const messageEl = document.getElementById('statusMessage');
-            messageEl.className = `status-message status-${type}`;
+            if (!messageEl) return;
             
             let icon, color;
             switch(type) {
@@ -1913,6 +1591,10 @@
                 case 'error':
                     icon = 'exclamation-circle';
                     color = colors.danger;
+                    break;
+                case 'warning':
+                    icon = 'exclamation-triangle';
+                    color = colors.warning;
                     break;
                 default:
                     icon = 'info-circle';
@@ -1926,132 +1608,79 @@
                     <span style="font-size: 14px; color: ${colors.textGray};">${text}</span>
                 </div>
             `;
+            messageEl.className = `status-message status-${type}`;
             messageEl.style.display = 'flex';
             
             setTimeout(() => {
                 messageEl.style.display = 'none';
-            }, 5000);
-        }
-        
-  
-// INITIALIZATION
-// ==============================
-
-// Initialize application
-document.addEventListener('DOMContentLoaded', async () => {
-    // First, check if we're coming back from OAuth with a code
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('code');
-    
-    if (code) {
-        // We have an OAuth code, redirect to auth-callback
-        window.location.href = `/auth-callback.html?code=${code}`;
-        return;
-    }
-    
-    // Check if user is already authenticated
-    const isAuthenticated = await checkAuthStatus();
-    
-    if (isAuthenticated) {
-        // User is authenticated, show main app
-        showMainApplication();
-    } else {
-        // User not authenticated, show login screen
-        document.getElementById('discordLoginSection').style.display = 'flex';
-        document.getElementById('mainApp').style.display = 'none';
-        initDiscordLogin();
-    }
-    
-    // Setup logout button
-    document.getElementById('logoutBtn')?.addEventListener('click', logout);
-});
-
-// Enhanced authentication check
-async function checkAuthStatus() {
-    // Check localStorage first
-    const token = localStorage.getItem('gta_dealership_token');
-    const userData = localStorage.getItem('gta_dealership_user');
-    const isAuthenticated = localStorage.getItem('gta_dealership_authenticated');
-    
-    if (!token || !userData || isAuthenticated !== 'true') {
-        return false;
-    }
-    
-    try {
-        // Verify token with backend
-        const response = await fetch(`${API_BASE_URL}/verify-auth`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
-        
-        if (response.ok) {
-            const data = await response.json();
-            currentUser = JSON.parse(userData);
-            userRole = data.role || localStorage.getItem('gta_dealership_role');
-            authToken = token;
-            return true;
-        } else {
-            // Token invalid, clear storage
-            clearAuthData();
-            return false;
-        }
-    } catch (error) {
-        console.error('Auth check failed:', error);
-        return false;
-    }
-}
-
-// Clear authentication data
-function clearAuthData() {
-    localStorage.removeItem('gta_dealership_token');
-    localStorage.removeItem('gta_dealership_user');
-    localStorage.removeItem('gta_dealership_role');
-    localStorage.removeItem('gta_dealership_authenticated');
-}
-
-// Update logout function
-function logout() {
-    clearAuthData();
-    window.location.reload();
-}
-
-// Handle OAuth callback (this is now handled by auth-callback.html)
-async function handleOAuthCallback(code) {
-    try {
-        const response = await fetch(`${API_BASE_URL}/discord-auth`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ code })
-        });
-        
-        if (response.ok) {
-            const data = await response.json();
-            
-            // Store token and user data
-            localStorage.setItem('gta_dealership_token', data.token);
-            localStorage.setItem('gta_dealership_user', JSON.stringify(data.user));
-            localStorage.setItem('gta_dealership_role', data.role || 'customer');
-            localStorage.setItem('gta_dealership_authenticated', 'true');
-            
-            // Remove code from URL
-            window.history.replaceState({}, document.title, window.location.pathname);
-            
-            // Reload to show authenticated state
-            window.location.reload();
-        } else {
-            showMessage('error', 'Authentication failed');
-            setTimeout(() => {
-                window.location.href = '/';
             }, 3000);
         }
-    } catch (error) {
-        console.error('OAuth error:', error);
-        showMessage('error', 'Network error during authentication');
-    }
-}
+        
+        // ==============================
+        // MAIN INITIALIZATION
+        // ==============================
+        
+        // Initialize application when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('=== GTA V DEALERSHIP INITIALIZATION ===');
+            
+            // Check if we have an auth code in the URL (from Discord redirect)
+            const hasAuthCode = checkForAuthCode();
+            
+            // Check if user is already authenticated
+            const isAuthenticated = checkAuth();
+            
+            console.log('Authentication status:', {
+                hasAuthCode: hasAuthCode,
+                isAuthenticated: isAuthenticated,
+                currentUser: currentUser
+            });
+            
+            if (isAuthenticated) {
+                // User is authenticated, show main app
+                console.log('Showing main application for authenticated user');
+                showMainApplication();
+            } else {
+                // User not authenticated, show login screen
+                console.log('Showing login screen');
+                document.getElementById('discordLoginSection').style.display = 'flex';
+                document.getElementById('mainApp').style.display = 'none';
+                initDiscordLogin();
+            }
+            
+            // Setup logout button if it exists
+            const logoutBtn = document.getElementById('logoutBtn');
+            if (logoutBtn) {
+                logoutBtn.addEventListener('click', logout);
+            }
+            
+            // Make simulateAuth available globally for test button
+            window.simulateAuth = simulateAuth;
+            
+            console.log('=== INITIALIZATION COMPLETE ===');
+        });
+    </script>
+    
+    <!-- Debug script -->
+    <script>
+        // Debug information
+        console.log('Page loaded successfully');
+        console.log('LocalStorage auth check:', {
+            token: localStorage.getItem('gta_dealership_token'),
+            user: localStorage.getItem('gta_dealership_user'),
+            role: localStorage.getItem('gta_dealership_role')
+        });
+        
+        // Auto-login for testing (can be removed in production)
+        // Uncomment to automatically login when page loads
+        /*
+        setTimeout(function() {
+            if (!localStorage.getItem('gta_dealership_token')) {
+                console.log('Auto-login for testing...');
+                simulateAuth();
+            }
+        }, 500);
+        */
     </script>
 </body>
 </html>
