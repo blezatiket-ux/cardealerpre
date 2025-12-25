@@ -1,10 +1,9 @@
 const fetch = require('node-fetch');
 
 exports.handler = async (event) => {
-    console.log('=== DISCORD AUTH DEBUG ===');
-    console.log('HTTP Method:', event.httpMethod);
+    // Log start
+    console.log('🎮 DISCORD AUTH STARTED 🎮');
     
-    // Only allow POST requests
     if (event.httpMethod !== 'POST') {
         return {
             statusCode: 405,
@@ -13,31 +12,17 @@ exports.handler = async (event) => {
     }
     
     try {
-        const body = JSON.parse(event.body);
-        const { code } = body;
-        
-        console.log('Received code:', code ? 'Yes (length: ' + code.length + ')' : 'No');
+        const { code } = JSON.parse(event.body);
         
         if (!code) {
             return {
                 statusCode: 400,
-                body: JSON.stringify({ error: 'No authorization code provided' })
+                body: JSON.stringify({ error: 'No authorization code' })
             };
         }
         
-        // Check environment variables
-        console.log('Checking environment variables...');
-        const envVars = {
-            DISCORD_CLIENT_ID: process.env.DISCORD_CLIENT_ID ? '✓ Set' : '✗ Missing',
-            DISCORD_CLIENT_SECRET: process.env.DISCORD_CLIENT_SECRET ? '✓ Set' : '✗ Missing',
-            DISCORD_REDIRECT_URI: process.env.DISCORD_REDIRECT_URI ? '✓ Set' : '✗ Missing',
-            DISCORD_GUILD_ID: process.env.DISCORD_GUILD_ID ? '✓ Set' : '✗ Missing',
-            DISCORD_BOT_TOKEN: process.env.DISCORD_BOT_TOKEN ? '✓ Set' : '✗ Missing'
-        };
-        console.log('Env vars:', JSON.stringify(envVars, null, 2));
-        
-        // Exchange code for access token
-        console.log('Exchanging code for token...');
+        // 1. EXCHANGE CODE FOR TOKEN
+        console.log('🔄 Exchanging code for token...');
         const tokenResponse = await fetch('https://discord.com/api/oauth2/token', {
             method: 'POST',
             headers: {
@@ -49,167 +34,128 @@ exports.handler = async (event) => {
                 grant_type: 'authorization_code',
                 code: code,
                 redirect_uri: process.env.DISCORD_REDIRECT_URI,
-                scope: 'identify guilds guilds.members.read'
+                scope: 'identify guilds'
             })
         });
         
-        console.log('Token response status:', tokenResponse.status);
         const tokenData = await tokenResponse.json();
-        console.log('Token data:', JSON.stringify(tokenData, null, 2));
         
-        if (!tokenResponse.ok || !tokenData.access_token) {
-            console.error('Token exchange failed:', tokenData);
+        if (!tokenData.access_token) {
+            console.error('❌ Token error:', tokenData);
             return {
-                statusCode: 401,
+                statusCode: 400,
                 body: JSON.stringify({ 
-                    error: 'Failed to get access token from Discord',
-                    details: tokenData.error_description || tokenData.error || 'Unknown error',
-                    debug: tokenData
+                    error: 'Discord auth failed', 
+                    details: tokenData.error_description || 'Check Discord app settings'
                 })
             };
         }
         
-        console.log('Token exchange successful!');
+        console.log('✅ Got Discord access token');
         
-        // Get user info from Discord
-        console.log('Fetching user info...');
+        // 2. GET USER INFO
+        console.log('👤 Getting user info...');
         const userResponse = await fetch('https://discord.com/api/users/@me', {
             headers: {
                 Authorization: `Bearer ${tokenData.access_token}`
             }
         });
         
-        console.log('User response status:', userResponse.status);
         const userData = await userResponse.json();
-        console.log('User data:', JSON.stringify(userData, null, 2));
+        console.log('✅ User data:', userData.username);
         
-        if (!userResponse.ok) {
-            return {
-                statusCode: 401,
-                body: JSON.stringify({ 
-                    error: 'Failed to get user info',
-                    debug: userData
-                })
-            };
-        }
-        
-        // Get user's guilds
-        console.log('Fetching user guilds...');
+        // 3. GET USER'S SERVERS (GUILDS)
+        console.log('🏢 Getting user guilds...');
         const guildsResponse = await fetch('https://discord.com/api/users/@me/guilds', {
             headers: {
                 Authorization: `Bearer ${tokenData.access_token}`
             }
         });
         
-        console.log('Guilds response status:', guildsResponse.status);
         const guilds = await guildsResponse.json();
-        console.log('User guilds:', Array.isArray(guilds) ? guilds.length + ' guilds' : 'Error');
         
-        // Get your Discord server ID
-        const YOUR_GUILD_ID = process.env.DISCORD_GUILD_ID;
-        console.log('Looking for guild ID:', YOUR_GUILD_ID);
+        // Check if user is in required guild
+        const requiredGuildId = process.env.DISCORD_GUILD_ID;
+        const isInGuild = guilds.some(guild => guild.id === requiredGuildId);
         
-        // Check if user is in your guild
-        const userGuild = Array.isArray(guilds) ? guilds.find(guild => guild.id === YOUR_GUILD_ID) : null;
-        console.log('User in guild?', userGuild ? '✓ Yes' : '✗ No');
-        
-        if (!userGuild) {
-            console.log('Guilds user IS in:', Array.isArray(guilds) ? guilds.map(g => g.name).join(', ') : 'N/A');
-            
+        if (!isInGuild) {
+            console.log('❌ User not in required guild');
             return {
                 statusCode: 403,
-                body: JSON.stringify({ 
-                    error: 'You must be a member of our Discord server to access the dealership',
-                    requiredGuildId: YOUR_GUILD_ID,
-                    userGuilds: Array.isArray(guilds) ? guilds.map(g => ({ id: g.id, name: g.name })) : [],
-                    user: {
-                        id: userData.id,
-                        username: userData.username
-                    }
+                body: JSON.stringify({
+                    error: 'Join our Discord server first',
+                    inviteLink: process.env.DISCORD_INVITE_LINK || 'https://discord.gg/your-server'
                 })
             };
         }
         
-        console.log('User found in guild:', userGuild.name);
+        console.log('✅ User is in required guild');
         
-        // Get user's roles in your guild using BOT token
-        console.log('Fetching user roles with bot token...');
-        const memberResponse = await fetch(`https://discord.com/api/guilds/${YOUR_GUILD_ID}/members/${userData.id}`, {
-            headers: {
-                Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}`
-            }
-        });
+        // 4. GET USER'S ROLES IN GUILD (Using BOT token)
+        console.log('🎭 Getting user roles...');
+        let userRole = 'customer'; // Default role
         
-        console.log('Member response status:', memberResponse.status);
-        
-        let userRole = 'customer';
-        let memberData = null;
-        
-        if (memberResponse.ok) {
-            memberData = await memberResponse.json();
-            console.log('Member data:', JSON.stringify(memberData, null, 2));
+        try {
+            const memberResponse = await fetch(
+                `https://discord.com/api/guilds/${requiredGuildId}/members/${userData.id}`, {
+                headers: {
+                    Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}`
+                }
+            });
             
-            if (memberData.roles && memberData.roles.length > 0) {
-                console.log('User roles:', memberData.roles);
+            if (memberResponse.ok) {
+                const memberData = await memberResponse.json();
                 
-                // Get role IDs from environment
-                const ROLE_IDS = {
-                    owner: process.env.ROLE_OWNER_ID,
-                    manager: process.env.ROLE_MANAGER_ID,
-                    customer: process.env.ROLE_CUSTOMER_ID
+                // DEBUG: Log all roles user has
+                console.log('🔍 User roles IDs:', memberData.roles);
+                
+                // Define your Discord role IDs here
+                const roleIds = {
+                    owner: process.env.ROLE_OWNER_ID || '1182247506895798366',
+                    manager: process.env.ROLE_MANAGER_ID || '1182247506895798365',
+                    customer: process.env.ROLE_CUSTOMER_ID || '1182247506895798364'
                 };
                 
-                console.log('Configured role IDs:', ROLE_IDS);
+                console.log('🔍 Configured role IDs:', roleIds);
                 
-                // Check roles
-                if (ROLE_IDS.owner && memberData.roles.includes(ROLE_IDS.owner)) {
+                // Check roles in priority order
+                if (memberData.roles.includes(roleIds.owner)) {
                     userRole = 'owner';
-                    console.log('Role assigned: owner');
-                } else if (ROLE_IDS.manager && memberData.roles.includes(ROLE_IDS.manager)) {
+                    console.log('👑 User is OWNER');
+                } else if (memberData.roles.includes(roleIds.manager)) {
                     userRole = 'manager';
-                    console.log('Role assigned: manager');
-                } else if (ROLE_IDS.customer && memberData.roles.includes(ROLE_IDS.customer)) {
+                    console.log('💼 User is MANAGER');
+                } else if (memberData.roles.includes(roleIds.customer)) {
                     userRole = 'customer';
-                    console.log('Role assigned: customer');
-                } else {
+                    console.log('👤 User is CUSTOMER');
+                } else if (memberData.roles.length > 0) {
                     userRole = 'member';
-                    console.log('Role assigned: member (no specific role)');
+                    console.log('🌟 User is MEMBER');
                 }
-            } else {
-                console.log('User has no roles in this guild');
-                userRole = 'guest';
             }
-        } else {
-            const errorText = await memberResponse.text();
-            console.error('Failed to get member data:', errorText);
-            userRole = 'customer'; // Fallback
+        } catch (roleError) {
+            console.warn('⚠️ Could not fetch roles, using default:', roleError.message);
         }
         
-        console.log('Final user role:', userRole);
-        
-        // Create token
+        // 5. CREATE AUTH TOKEN
         const tokenPayload = {
             userId: userData.id,
             username: userData.username,
-            discriminator: userData.discriminator,
             avatar: userData.avatar,
             global_name: userData.global_name,
+            discriminator: userData.discriminator,
             role: userRole,
-            guildId: YOUR_GUILD_ID,
-            iat: Date.now(),
-            exp: Date.now() + (7 * 24 * 60 * 60 * 1000)
+            exp: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
         };
         
         const token = Buffer.from(JSON.stringify(tokenPayload)).toString('base64');
         
-        console.log('Auth successful! Returning data...');
-        console.log('User role for UI:', userRole);
-        console.log('User data for UI:', {
-            id: userData.id,
+        console.log('🎉 AUTH SUCCESSFUL!');
+        console.log('📋 Final data:', {
             username: userData.username,
-            avatar: userData.avatar
+            role: userRole,
+            userId: userData.id
         });
-        console.log('=== END DEBUG ===');
         
         return {
             statusCode: 200,
@@ -220,28 +166,23 @@ exports.handler = async (event) => {
                     username: userData.username,
                     avatar: userData.avatar,
                     discriminator: userData.discriminator,
-                    global_name: userData.global_name
+                    global_name: userData.global_name,
+                    avatar_url: userData.avatar 
+                        ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png`
+                        : null
                 },
                 role: userRole,
-                guild: userGuild.name,
-                memberSince: new Date().toISOString(),
-                debug: {
-                    guildId: YOUR_GUILD_ID,
-                    rolesChecked: memberData?.roles || []
-                }
+                guild: guilds.find(g => g.id === requiredGuildId)?.name || 'GTA V Dealership'
             })
         };
         
     } catch (error) {
-        console.error('DISCORD AUTH ERROR:', error);
-        console.error('Error stack:', error.stack);
-        
+        console.error('💥 AUTH ERROR:', error);
         return {
             statusCode: 500,
             body: JSON.stringify({ 
-                error: 'Internal server error',
-                message: error.message,
-                stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+                error: 'Authentication failed',
+                message: error.message 
             })
         };
     }
