@@ -922,765 +922,801 @@
 
     <!-- Main JavaScript -->
     <script>
-        // ==============================
-        // APPLICATION CONFIGURATION
-        // ==============================
+    // ==============================
+    // APPLICATION CONFIGURATION
+    // ==============================
+    
+    // Discord OAuth Configuration
+    const DISCORD_CLIENT_ID = '1449863144712179885';
+    const REDIRECT_URI = 'https://bright-profiterole-76ddbc.netlify.app/auth-callback.html';
+    const DISCORD_OAUTH_URL = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=identify%20guilds%20guilds.members.read`;
+    
+    // Color definitions
+    const colors = {
+        primary: '#ff4400',
+        primaryDark: '#cc3300',
+        secondary: '#111111',
+        accent: '#5865F2',
+        discordBlurple: '#5865F2',
+        discordGreen: '#57F287',
+        discordYellow: '#FEE75C',
+        discordRed: '#ED4245',
+        textLight: '#ffffff',
+        textGray: '#b0b0c0',
+        success: '#00ff88',
+        warning: '#ffb142',
+        danger: '#ff4757',
+        darkBg: '#0a0a0f'
+    };
+    
+    // Application State
+    let currentUser = null;
+    let userRole = null;
+    
+    // ==============================
+    // AUTHENTICATION FUNCTIONS
+    // ==============================
+    
+    // Check if user is authenticated
+    function checkAuth() {
+        const token = localStorage.getItem('gta_dealership_token');
+        const userData = localStorage.getItem('gta_dealership_user');
         
-        // Discord OAuth Configuration
-        const DISCORD_CLIENT_ID = '1449863144712179885';
-        const REDIRECT_URI = 'https://bright-profiterole-76ddbc.netlify.app/auth-callback.html';
-        const DISCORD_OAUTH_URL = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=identify%20guilds`;
+        console.log('Checking auth...');
         
-        // Color definitions matching CSS variables
-        const colors = {
-            primary: '#ff4400',
-            primaryDark: '#cc3300',
-            secondary: '#111111',
-            accent: '#5865F2',
-            discordBlurple: '#5865F2',
-            discordGreen: '#57F287',
-            discordYellow: '#FEE75C',
-            discordRed: '#ED4245',
-            textLight: '#ffffff',
-            textGray: '#b0b0c0',
-            success: '#00ff88',
-            warning: '#ffb142',
-            danger: '#ff4757',
-            darkBg: '#0a0a0f'
-        };
-        
-        // Application State
-        let currentUser = null;
-        let userRole = 'customer';
-        let authToken = null;
-        
-        // ==============================
-        // AUTHENTICATION FUNCTIONS
-        // ==============================
-        
-        // Check if user is authenticated
-        function checkAuth() {
-            const token = localStorage.getItem('gta_dealership_token');
-            const userData = localStorage.getItem('gta_dealership_user');
-            
-            console.log('Checking auth...');
-            console.log('Token exists:', !!token);
-            console.log('User data exists:', !!userData);
-            
-            if (token && userData) {
-                try {
-                    currentUser = JSON.parse(userData);
-                    authToken = token;
-                    userRole = localStorage.getItem('gta_dealership_role') || 'customer';
-                    console.log('User authenticated:', currentUser.username);
-                    return true;
-                } catch (e) {
-                    console.error('Error parsing user data:', e);
-                    return false;
-                }
-            }
-            return false;
-        }
-        
-        // Initialize Discord Login
-        function initDiscordLogin() {
-            const loginBtn = document.getElementById('discordLoginBtn');
-            if (loginBtn) {
-                loginBtn.addEventListener('click', () => {
-                    console.log('Redirecting to Discord OAuth...');
-                    window.location.href = DISCORD_OAUTH_URL;
+        if (token && userData) {
+            try {
+                currentUser = JSON.parse(userData);
+                userRole = localStorage.getItem('gta_dealership_role') || 'customer';
+                
+                console.log('User authenticated:', {
+                    username: currentUser.username,
+                    role: userRole
                 });
-            }
-        }
-        
-        // Show main application
-        function showMainApplication() {
-            console.log('Showing main application...');
-            
-            document.getElementById('discordLoginSection').style.display = 'none';
-            document.getElementById('mainApp').style.display = 'block';
-            
-            // Update user profile
-            updateUserProfile();
-            
-            // Setup UI based on role
-            setupRoleBasedUI();
-            
-            // Initialize other features
-            loadVehicles();
-            initColorPalette();
-            setupEventListeners();
-            
-            // Show welcome message
-            showMessage('success', `Welcome back, ${currentUser.username}!`);
-        }
-        
-        // Update user profile display
-        function updateUserProfile() {
-            if (!currentUser) return;
-            
-            const avatarEl = document.getElementById('userAvatar');
-            const nameEl = document.getElementById('userName');
-            const roleEl = document.getElementById('userRole');
-            
-            // Set avatar
-            avatarEl.innerHTML = '<i class="fas fa-user"></i>';
-            avatarEl.style.background = `linear-gradient(135deg, ${colors.primary}, ${colors.accent})`;
-            
-            // Set name and role
-            nameEl.textContent = currentUser.username || 'Discord User';
-            roleEl.textContent = userRole.charAt(0).toUpperCase() + userRole.slice(1);
-            
-            // Set role color
-            switch(userRole.toLowerCase()) {
-                case 'owner':
-                    roleEl.style.color = '#ffd700';
-                    break;
-                case 'manager':
-                    roleEl.style.color = '#00a8ff';
-                    break;
-                case 'customer':
-                    roleEl.style.color = '#00ff88';
-                    break;
-                default:
-                    roleEl.style.color = colors.textGray;
-            }
-        }
-        
-        // Setup UI based on user role
-        function setupRoleBasedUI() {
-            const adminPanel = document.getElementById('adminPanel');
-            const purchaseHistory = document.getElementById('purchaseHistory');
-            
-            // Hide both by default
-            if (adminPanel) adminPanel.style.display = 'none';
-            if (purchaseHistory) purchaseHistory.style.display = 'none';
-            
-            // Show based on role
-            if (userRole === 'owner' || userRole === 'manager') {
-                if (adminPanel) {
-                    adminPanel.style.display = 'block';
-                    setupAdminPanel();
-                }
-                if (purchaseHistory) purchaseHistory.style.display = 'block';
-            } else if (userRole === 'customer') {
-                if (purchaseHistory) purchaseHistory.style.display = 'block';
-            }
-        }
-        
-        // Setup admin panel
-        function setupAdminPanel() {
-            // Setup tab switching
-            document.querySelectorAll('.tab-btn').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    document.querySelectorAll('.tab-btn').forEach(b => {
-                        b.classList.remove('active');
-                    });
-                    document.querySelectorAll('.tab-content').forEach(c => {
-                        c.classList.remove('active');
-                    });
-                    
-                    this.classList.add('active');
-                    const tabId = this.dataset.tab + 'Tab';
-                    const tabContent = document.getElementById(tabId);
-                    if (tabContent) tabContent.classList.add('active');
-                });
-            });
-            
-            // Add sample data to orders table
-            const ordersTable = document.getElementById('ordersTable');
-            if (ordersTable) {
-                ordersTable.innerHTML = `
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Order ID</th>
-                                <th>Customer</th>
-                                <th>Vehicle</th>
-                                <th>Price</th>
-                                <th>Status</th>
-                                <th>Date</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>ORD001</td>
-                                <td>John_Doe</td>
-                                <td>Karin Sultan</td>
-                                <td>$250,000</td>
-                                <td><span class="status-badge status-pending">Pending</span></td>
-                                <td>2024-01-15</td>
-                                <td>
-                                    <button class="btn-approve" style="background: rgba(0,255,136,0.2); color: ${colors.success}; border: none; border-radius: 5px; padding: 5px 10px; cursor: pointer; margin-right: 5px;">
-                                        <i class="fas fa-check"></i>
-                                    </button>
-                                    <button class="btn-reject" style="background: rgba(255,71,87,0.2); color: ${colors.danger}; border: none; border-radius: 5px; padding: 5px 10px; cursor: pointer;">
-                                        <i class="fas fa-times"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>ORD002</td>
-                                <td>Jane_Smith</td>
-                                <td>Bravado Buffalo</td>
-                                <td>$350,000</td>
-                                <td><span class="status-badge status-approved">Approved</span></td>
-                                <td>2024-01-14</td>
-                                <td>
-                                    <button class="btn-deliver" style="background: rgba(88,101,242,0.2); color: ${colors.accent}; border: none; border-radius: 5px; padding: 5px 10px; cursor: pointer;">
-                                        <i class="fas fa-truck"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                `;
-            }
-        }
-        
-        // Logout function
-        function logout() {
-            localStorage.removeItem('gta_dealership_token');
-            localStorage.removeItem('gta_dealership_user');
-            localStorage.removeItem('gta_dealership_role');
-            window.location.reload();
-        }
-        
-        // ==============================
-        // SIMULATED AUTH (For testing)
-        // ==============================
-        
-        // Simulate authentication for testing
-        function simulateAuth() {
-            console.log('Simulating authentication...');
-            
-            // Create a mock user
-            const mockUser = {
-                id: '123456789',
-                username: 'TestUser_' + Math.floor(Math.random() * 1000),
-                avatar: null,
-                discriminator: '0001'
-            };
-            
-            // Store mock auth data
-            localStorage.setItem('gta_dealership_token', 'mock-token-' + Date.now());
-            localStorage.setItem('gta_dealership_user', JSON.stringify(mockUser));
-            localStorage.setItem('gta_dealership_role', 'customer');
-            
-            // Show success message
-            showMessage('success', 'Test login successful!');
-            
-            // Reload to apply changes
-            setTimeout(() => {
-                window.location.reload();
-            }, 1000);
-        }
-        
-        // ==============================
-        // CHECK FOR AUTH CODE IN URL
-        // ==============================
-        
-        // Check if we have an auth code in the URL
-        function checkForAuthCode() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const code = urlParams.get('code');
-            
-            if (code) {
-                console.log('Found auth code in URL');
-                
-                // Store the code temporarily
-                localStorage.setItem('discord_auth_code', code);
-                
-                // Remove code from URL without reloading
-                const newUrl = window.location.pathname;
-                window.history.replaceState({}, document.title, newUrl);
-                
-                // For now, simulate authentication since backend might not be set up
-                simulateAuth();
                 
                 return true;
+            } catch (e) {
+                console.error('Error parsing user data:', e);
+                return false;
             }
-            return false;
+        }
+        return false;
+    }
+    
+    // Initialize Discord Login
+    function initDiscordLogin() {
+        const loginBtn = document.getElementById('discordLoginBtn');
+        if (loginBtn) {
+            loginBtn.addEventListener('click', () => {
+                console.log('Redirecting to Discord OAuth...');
+                window.location.href = DISCORD_OAUTH_URL;
+            });
+        }
+    }
+    
+    // Show main application
+    function showMainApplication() {
+        console.log('Showing main application...');
+        
+        document.getElementById('discordLoginSection').style.display = 'none';
+        document.getElementById('mainApp').style.display = 'block';
+        
+        // Update user profile
+        updateUserProfile();
+        
+        // Setup UI based on role
+        setupRoleBasedUI();
+        
+        // Initialize other features
+        loadVehicles();
+        initColorPalette();
+        setupEventListeners();
+        
+        // Show welcome message
+        showMessage('success', `Welcome back, ${currentUser.username}! (${userRole.toUpperCase()})`);
+    }
+    
+    // Update user profile display
+    function updateUserProfile() {
+        if (!currentUser) return;
+        
+        const avatarEl = document.getElementById('userAvatar');
+        const nameEl = document.getElementById('userName');
+        const roleEl = document.getElementById('userRole');
+        
+        // Set avatar
+        avatarEl.innerHTML = '<i class="fas fa-user"></i>';
+        avatarEl.style.background = `linear-gradient(135deg, ${colors.primary}, ${colors.accent})`;
+        
+        // Set name and role
+        nameEl.textContent = currentUser.username || 'Discord User';
+        roleEl.textContent = userRole.charAt(0).toUpperCase() + userRole.slice(1);
+        
+        // Set role color
+        switch(userRole.toLowerCase()) {
+            case 'owner':
+                roleEl.style.color = '#ffd700';
+                break;
+            case 'manager':
+                roleEl.style.color = '#00a8ff';
+                break;
+            case 'customer':
+                roleEl.style.color = '#00ff88';
+                break;
+            default:
+                roleEl.style.color = colors.textGray;
         }
         
-        // ==============================
-        // VEHICLE MANAGEMENT
-        // ==============================
+        console.log('User profile updated:', { username: currentUser.username, role: userRole });
+    }
+    
+    // Setup UI based on user role
+    function setupRoleBasedUI() {
+        const adminPanel = document.getElementById('adminPanel');
+        const purchaseHistory = document.getElementById('purchaseHistory');
         
-        function loadVehicles() {
-            // Vehicle data
-            const vehicles = [
-                {
-                    id: 1,
-                    name: "Karin Sultan",
-                    price: 250000,
-                    class: "Sports",
-                    category: "sedan",
-                    seats: 4,
-                    topSpeed: "210 km/h",
-                    acceleration: "5.2s",
-                    description: "Classic Japanese sports sedan"
-                },
-                {
-                    id: 2,
-                    name: "Bravado Buffalo",
-                    price: 350000,
-                    class: "Muscle",
-                    category: "muscle",
-                    seats: 4,
-                    topSpeed: "230 km/h",
-                    acceleration: "4.8s",
-                    description: "Modern American muscle car"
-                },
-                {
-                    id: 3,
-                    name: "Pfister Comet",
-                    price: 450000,
-                    class: "Sports",
-                    category: "sports",
-                    seats: 2,
-                    topSpeed: "240 km/h",
-                    acceleration: "4.2s",
-                    description: "German sports car"
-                },
-                {
-                    id: 4,
-                    name: "Dewbauchee Vagner",
-                    price: 1500000,
-                    class: "Super",
-                    category: "super",
-                    seats: 2,
-                    topSpeed: "320 km/h",
-                    acceleration: "3.1s",
-                    description: "British hypercar"
-                },
-                {
-                    id: 5,
-                    name: "Canis Mesa",
-                    price: 120000,
-                    class: "Off-Road",
-                    category: "suv",
-                    seats: 4,
-                    topSpeed: "160 km/h",
-                    acceleration: "6.8s",
-                    description: "Military-grade SUV"
-                }
-            ];
-            
-            renderVehicleList(vehicles);
+        console.log('Setting up UI for role:', userRole);
+        
+        // Hide both by default
+        if (adminPanel) adminPanel.style.display = 'none';
+        if (purchaseHistory) purchaseHistory.style.display = 'none';
+        
+        // Show based on role
+        if (userRole === 'owner' || userRole === 'manager') {
+            console.log('Showing admin panel for', userRole);
+            if (adminPanel) {
+                adminPanel.style.display = 'block';
+                setupAdminPanel();
+            }
+            if (purchaseHistory) purchaseHistory.style.display = 'block';
+        } else if (userRole === 'customer') {
+            console.log('Showing customer UI');
+            if (purchaseHistory) purchaseHistory.style.display = 'block';
+        }
+    }
+    
+    // Setup admin panel
+    function setupAdminPanel() {
+        console.log('Setting up admin panel...');
+        
+        // Setup tab switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.tab-btn').forEach(b => {
+                    b.classList.remove('active');
+                });
+                document.querySelectorAll('.tab-content').forEach(c => {
+                    c.classList.remove('active');
+                });
+                
+                this.classList.add('active');
+                const tabId = this.dataset.tab + 'Tab';
+                const tabContent = document.getElementById(tabId);
+                if (tabContent) tabContent.classList.add('active');
+            });
+        });
+        
+        // Add sample data to orders table
+        const ordersTable = document.getElementById('ordersTable');
+        if (ordersTable) {
+            ordersTable.innerHTML = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Order ID</th>
+                            <th>Customer</th>
+                            <th>Vehicle</th>
+                            <th>Price</th>
+                            <th>Status</th>
+                            <th>Date</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>ORD001</td>
+                            <td>John_Doe</td>
+                            <td>Karin Sultan</td>
+                            <td>$250,000</td>
+                            <td><span class="status-badge status-pending">Pending</span></td>
+                            <td>2024-01-15</td>
+                            <td>
+                                <button class="btn-approve" onclick="approveOrder('ORD001')" style="background: rgba(0,255,136,0.2); color: ${colors.success}; border: none; border-radius: 5px; padding: 5px 10px; cursor: pointer; margin-right: 5px;">
+                                    <i class="fas fa-check"></i>
+                                </button>
+                                <button class="btn-reject" onclick="rejectOrder('ORD001')" style="background: rgba(255,71,87,0.2); color: ${colors.danger}; border: none; border-radius: 5px; padding: 5px 10px; cursor: pointer;">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>ORD002</td>
+                            <td>Jane_Smith</td>
+                            <td>Bravado Buffalo</td>
+                            <td>$350,000</td>
+                            <td><span class="status-badge status-approved">Approved</span></td>
+                            <td>2024-01-14</td>
+                            <td>
+                                <button class="btn-deliver" onclick="deliverOrder('ORD002')" style="background: rgba(88,101,242,0.2); color: ${colors.accent}; border: none; border-radius: 5px; padding: 5px 10px; cursor: pointer;">
+                                    <i class="fas fa-truck"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            `;
         }
         
-        function renderVehicleList(vehicles) {
-            const vehicleList = document.getElementById('vehicleList');
-            if (!vehicleList) return;
+        // Add sample data to vehicles table
+        const vehiclesTable = document.getElementById('vehiclesTable');
+        if (vehiclesTable) {
+            vehiclesTable.innerHTML = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Vehicle</th>
+                            <th>Price</th>
+                            <th>Category</th>
+                            <th>Stock</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Karin Sultan</strong></td>
+                            <td>$250,000</td>
+                            <td>Sports Sedan</td>
+                            <td>5</td>
+                            <td>
+                                <button class="btn-edit" style="background: rgba(255,177,66,0.2); color: ${colors.warning}; border: none; border-radius: 5px; padding: 5px 10px; cursor: pointer; margin-right: 5px;">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn-delete" style="background: rgba(255,71,87,0.2); color: ${colors.danger}; border: none; border-radius: 5px; padding: 5px 10px; cursor: pointer;">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            `;
+        }
+    }
+    
+    // Admin order functions
+    function approveOrder(orderId) {
+        showMessage('success', `Order ${orderId} approved!`);
+    }
+    
+    function rejectOrder(orderId) {
+        showMessage('warning', `Order ${orderId} rejected!`);
+    }
+    
+    function deliverOrder(orderId) {
+        showMessage('info', `Order ${orderId} marked as delivered!`);
+    }
+    
+    // Logout function
+    function logout() {
+        localStorage.removeItem('gta_dealership_token');
+        localStorage.removeItem('gta_dealership_user');
+        localStorage.removeItem('gta_dealership_role');
+        window.location.reload();
+    }
+    
+    // ==============================
+    // TEST AUTHENTICATION FUNCTIONS
+    // ==============================
+    
+    // Simulate authentication as CUSTOMER
+    function simulateAuthCustomer() {
+        console.log('Simulating authentication as Customer...');
+        
+        const mockUser = {
+            id: '123456789',
+            username: 'CustomerUser_' + Math.floor(Math.random() * 1000),
+            avatar: null,
+            discriminator: '0001'
+        };
+        
+        localStorage.setItem('gta_dealership_token', 'mock-token-' + Date.now());
+        localStorage.setItem('gta_dealership_user', JSON.stringify(mockUser));
+        localStorage.setItem('gta_dealership_role', 'customer');
+        
+        showMessage('success', 'Test login successful as Customer!');
+        
+        setTimeout(() => {
+            window.location.reload();
+        }, 1000);
+    }
+    
+    // Simulate authentication as MANAGER
+    function simulateAuthManager() {
+        console.log('Simulating authentication as Manager...');
+        
+        const mockUser = {
+            id: '987654321',
+            username: 'ManagerUser_' + Math.floor(Math.random() * 1000),
+            avatar: null,
+            discriminator: '0002'
+        };
+        
+        localStorage.setItem('gta_dealership_token', 'mock-token-' + Date.now());
+        localStorage.setItem('gta_dealership_user', JSON.stringify(mockUser));
+        localStorage.setItem('gta_dealership_role', 'manager');
+        
+        showMessage('success', 'Test login successful as Manager!');
+        
+        setTimeout(() => {
+            window.location.reload();
+        }, 1000);
+    }
+    
+    // Simulate authentication as OWNER
+    function simulateAuthOwner() {
+        console.log('Simulating authentication as Owner...');
+        
+        const mockUser = {
+            id: '555555555',
+            username: 'OwnerUser_' + Math.floor(Math.random() * 1000),
+            avatar: null,
+            discriminator: '0003'
+        };
+        
+        localStorage.setItem('gta_dealership_token', 'mock-token-' + Date.now());
+        localStorage.setItem('gta_dealership_user', JSON.stringify(mockUser));
+        localStorage.setItem('gta_dealership_role', 'owner');
+        
+        showMessage('success', 'Test login successful as Owner!');
+        
+        setTimeout(() => {
+            window.location.reload();
+        }, 1000);
+    }
+    
+    // ==============================
+    // CHECK FOR AUTH CODE IN URL
+    // ==============================
+    
+    function checkForAuthCode() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+        
+        if (code) {
+            console.log('Found auth code in URL');
+            localStorage.setItem('discord_auth_code', code);
+            const newUrl = window.location.pathname;
+            window.history.replaceState({}, document.title, newUrl);
             
-            vehicleList.innerHTML = '';
+            // Simulate as manager for testing
+            simulateAuthManager();
+            return true;
+        }
+        return false;
+    }
+    
+    // ==============================
+    // VEHICLE MANAGEMENT
+    // ==============================
+    
+    function loadVehicles() {
+        const vehicles = [
+            {
+                id: 1,
+                name: "Karin Sultan",
+                price: 250000,
+                class: "Sports",
+                category: "sedan",
+                seats: 4,
+                topSpeed: "210 km/h",
+                acceleration: "5.2s",
+                description: "Classic Japanese sports sedan"
+            },
+            {
+                id: 2,
+                name: "Bravado Buffalo",
+                price: 350000,
+                class: "Muscle",
+                category: "muscle",
+                seats: 4,
+                topSpeed: "230 km/h",
+                acceleration: "4.8s",
+                description: "Modern American muscle car"
+            },
+            {
+                id: 3,
+                name: "Pfister Comet",
+                price: 450000,
+                class: "Sports",
+                category: "sports",
+                seats: 2,
+                topSpeed: "240 km/h",
+                acceleration: "4.2s",
+                description: "German sports car"
+            }
+        ];
+        
+        renderVehicleList(vehicles);
+    }
+    
+    function renderVehicleList(vehicles) {
+        const vehicleList = document.getElementById('vehicleList');
+        if (!vehicleList) return;
+        
+        vehicleList.innerHTML = '';
+        
+        vehicles.forEach(vehicle => {
+            const vehicleItem = document.createElement('div');
+            vehicleItem.className = 'vehicle-item';
+            vehicleItem.dataset.id = vehicle.id;
+            vehicleItem.dataset.category = vehicle.category;
             
-            vehicles.forEach(vehicle => {
-                const vehicleItem = document.createElement('div');
-                vehicleItem.className = 'vehicle-item';
-                vehicleItem.dataset.id = vehicle.id;
-                vehicleItem.dataset.category = vehicle.category;
-                
-                let icon = 'fas fa-car';
-                if (vehicle.category === "suv") icon = 'fas fa-truck';
-                if (vehicle.category === "super") icon = 'fas fa-bolt';
-                if (vehicle.category === "muscle") icon = 'fas fa-horse-head';
-                if (vehicle.category === "sports") icon = 'fas fa-tachometer-alt';
-                
-                vehicleItem.innerHTML = `
-                    <div style="display: flex; gap: 15px; align-items: center; padding: 15px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 15px; margin-bottom: 10px; cursor: pointer;">
-                        <div style="width: 50px; height: 50px; background: rgba(255,68,0,0.1); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; color: ${colors.primary};">
-                            <i class="${icon}"></i>
-                        </div>
-                        <div style="flex: 1;">
-                            <div style="font-size: 16px; font-weight: 600; margin-bottom: 5px;">${vehicle.name}</div>
-                            <div style="font-size: 18px; font-weight: 700; color: ${colors.primary}; margin-bottom: 10px;">$${vehicle.price.toLocaleString()}</div>
-                            <div style="display: flex; gap: 15px; font-size: 12px; color: ${colors.textGray};">
-                                <div><i class="fas fa-users"></i> ${vehicle.seats} seats</div>
-                                <div><i class="fas fa-tachometer-alt"></i> ${vehicle.topSpeed}</div>
-                                <div><i class="fas fa-bolt"></i> ${vehicle.acceleration}</div>
-                            </div>
+            let icon = 'fas fa-car';
+            if (vehicle.category === "suv") icon = 'fas fa-truck';
+            if (vehicle.category === "super") icon = 'fas fa-bolt';
+            if (vehicle.category === "muscle") icon = 'fas fa-horse-head';
+            if (vehicle.category === "sports") icon = 'fas fa-tachometer-alt';
+            
+            vehicleItem.innerHTML = `
+                <div style="display: flex; gap: 15px; align-items: center; padding: 15px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 15px; margin-bottom: 10px; cursor: pointer;">
+                    <div style="width: 50px; height: 50px; background: rgba(255,68,0,0.1); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; color: ${colors.primary};">
+                        <i class="${icon}"></i>
+                    </div>
+                    <div style="flex: 1;">
+                        <div style="font-size: 16px; font-weight: 600; margin-bottom: 5px;">${vehicle.name}</div>
+                        <div style="font-size: 18px; font-weight: 700; color: ${colors.primary}; margin-bottom: 10px;">$${vehicle.price.toLocaleString()}</div>
+                        <div style="display: flex; gap: 15px; font-size: 12px; color: ${colors.textGray};">
+                            <div><i class="fas fa-users"></i> ${vehicle.seats} seats</div>
+                            <div><i class="fas fa-tachometer-alt"></i> ${vehicle.topSpeed}</div>
+                            <div><i class="fas fa-bolt"></i> ${vehicle.acceleration}</div>
                         </div>
                     </div>
-                `;
-                
-                vehicleItem.addEventListener('click', () => selectVehicle(vehicle));
-                vehicleList.appendChild(vehicleItem);
-            });
+                </div>
+            `;
             
-            // Select first vehicle
-            if (vehicles.length > 0) {
-                selectVehicle(vehicles[0]);
-            }
-            
-            // Setup category filtering
-            setupCategoryFiltering();
+            vehicleItem.addEventListener('click', () => selectVehicle(vehicle));
+            vehicleList.appendChild(vehicleItem);
+        });
+        
+        if (vehicles.length > 0) {
+            selectVehicle(vehicles[0]);
         }
         
-        function selectVehicle(vehicle) {
-            console.log('Selected vehicle:', vehicle.name);
-            
-            // Update UI elements
-            const nameDisplay = document.getElementById('vehicleNameDisplay');
-            const priceDisplay = document.getElementById('vehiclePriceDisplay');
-            
-            if (nameDisplay) nameDisplay.textContent = vehicle.name;
-            if (priceDisplay) priceDisplay.textContent = `$${vehicle.price.toLocaleString()}`;
-            
-            // Update vehicle info
-            const infoClass = document.getElementById('infoClass');
-            const infoSeats = document.getElementById('infoSeats');
-            const infoSpeed = document.getElementById('infoSpeed');
-            const infoAcceleration = document.getElementById('infoAcceleration');
-            
-            if (infoClass) infoClass.textContent = vehicle.class;
-            if (infoSeats) infoSeats.textContent = vehicle.seats;
-            if (infoSpeed) infoSpeed.textContent = vehicle.topSpeed;
-            if (infoAcceleration) infoAcceleration.textContent = vehicle.acceleration;
-            
-            // Show vehicle info display
-            const vehicleInfoDisplay = document.getElementById('vehicleInfoDisplay');
-            if (vehicleInfoDisplay) vehicleInfoDisplay.style.display = 'grid';
-            
-            // Update order summary
-            updateOrderSummary(vehicle);
+        setupCategoryFiltering();
+    }
+    
+    function selectVehicle(vehicle) {
+        const nameDisplay = document.getElementById('vehicleNameDisplay');
+        const priceDisplay = document.getElementById('vehiclePriceDisplay');
+        
+        if (nameDisplay) nameDisplay.textContent = vehicle.name;
+        if (priceDisplay) priceDisplay.textContent = `$${vehicle.price.toLocaleString()}`;
+        
+        const infoClass = document.getElementById('infoClass');
+        const infoSeats = document.getElementById('infoSeats');
+        const infoSpeed = document.getElementById('infoSpeed');
+        const infoAcceleration = document.getElementById('infoAcceleration');
+        
+        if (infoClass) infoClass.textContent = vehicle.class;
+        if (infoSeats) infoSeats.textContent = vehicle.seats;
+        if (infoSpeed) infoSpeed.textContent = vehicle.topSpeed;
+        if (infoAcceleration) infoAcceleration.textContent = vehicle.acceleration;
+        
+        const vehicleInfoDisplay = document.getElementById('vehicleInfoDisplay');
+        if (vehicleInfoDisplay) vehicleInfoDisplay.style.display = 'grid';
+        
+        updateOrderSummary(vehicle);
+    }
+    
+    function updateOrderSummary(vehicle) {
+        const summaryVehicle = document.getElementById('summaryVehicle');
+        const summaryPrice = document.getElementById('summaryPrice');
+        const summaryTotal = document.getElementById('summaryTotal');
+        
+        if (summaryVehicle) summaryVehicle.textContent = vehicle.name;
+        if (summaryPrice) summaryPrice.textContent = `$${vehicle.price.toLocaleString()}`;
+        if (summaryTotal) {
+            summaryTotal.textContent = `$${vehicle.price.toLocaleString()}`;
+            summaryTotal.style.color = colors.primary;
         }
-        
-        function updateOrderSummary(vehicle) {
-            const summaryVehicle = document.getElementById('summaryVehicle');
-            const summaryPrice = document.getElementById('summaryPrice');
-            const summaryTotal = document.getElementById('summaryTotal');
-            
-            if (summaryVehicle) summaryVehicle.textContent = vehicle.name;
-            if (summaryPrice) summaryPrice.textContent = `$${vehicle.price.toLocaleString()}`;
-            if (summaryTotal) {
-                summaryTotal.textContent = `$${vehicle.price.toLocaleString()}`;
-                summaryTotal.style.color = colors.primary;
-            }
-        }
-        
-        function setupCategoryFiltering() {
-            document.querySelectorAll('.category-btn').forEach(button => {
-                button.addEventListener('click', function() {
-                    document.querySelectorAll('.category-btn').forEach(btn => {
-                        btn.style.background = 'rgba(255,255,255,0.05)';
-                        btn.style.borderColor = 'rgba(255,255,255,0.1)';
-                    });
-                    
-                    this.style.background = colors.primary;
-                    this.style.borderColor = colors.primary;
-                    
-                    const category = this.dataset.category;
-                    filterVehicles(category);
-                });
-            });
-        }
-        
-        function filterVehicles(category) {
-            const vehicleItems = document.querySelectorAll('.vehicle-item');
-            
-            vehicleItems.forEach(item => {
-                if (category === 'all' || item.dataset.category === category) {
-                    item.style.display = 'block';
-                } else {
-                    item.style.display = 'none';
-                }
-            });
-        }
-        
-        // ==============================
-        // COLOR SELECTOR FUNCTIONS
-        // ==============================
-        
-        function initColorPalette() {
-            // Color presets
-            const gtaColors = [
-                { name: "Metallic Red", value: "#ff0000" },
-                { name: "Metallic Blue", value: "#0066cc" },
-                { name: "Metallic Black", value: "#0a0a0a" },
-                { name: "Metallic White", value: "#ffffff" },
-                { name: "Metallic Green", value: "#00aa55" },
-                { name: "Matte Black", value: "#111111" },
-                { name: "Matte Gray", value: "#444444" },
-                { name: "Chrome", value: "#aaaaaa" }
-            ];
-            
-            const colorPresets = document.getElementById('colorPresets');
-            if (!colorPresets) return;
-            
-            colorPresets.innerHTML = '';
-            
-            gtaColors.forEach((color, index) => {
-                const colorPreset = document.createElement('div');
-                colorPreset.className = 'color-preset';
-                colorPreset.style.background = color.value;
-                colorPreset.style.width = '40px';
-                colorPreset.style.height = '40px';
-                colorPreset.style.borderRadius = '10px';
-                colorPreset.style.cursor = 'pointer';
-                colorPreset.title = color.name;
-                
-                if (index === 0) {
-                    colorPreset.style.border = '2px solid white';
-                    colorPreset.style.boxShadow = '0 0 10px rgba(255,255,255,0.5)';
-                }
-                
-                colorPreset.addEventListener('click', function() {
-                    document.querySelectorAll('.color-preset').forEach(p => {
-                        p.style.border = 'none';
-                        p.style.boxShadow = 'none';
-                    });
-                    
-                    this.style.border = '2px solid white';
-                    this.style.boxShadow = '0 0 10px rgba(255,255,255,0.5)';
-                    
-                    // Update primary color
-                    const primaryColorPicker = document.getElementById('primaryColorPicker');
-                    const primaryColorHex = document.getElementById('primaryColorHex');
-                    const summaryPrimaryDot = document.getElementById('summaryPrimaryDot');
-                    
-                    if (primaryColorPicker) primaryColorPicker.value = color.value;
-                    if (primaryColorHex) primaryColorHex.value = color.value;
-                    if (summaryPrimaryDot) summaryPrimaryDot.style.background = color.value;
+    }
+    
+    function setupCategoryFiltering() {
+        document.querySelectorAll('.category-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                document.querySelectorAll('.category-btn').forEach(btn => {
+                    btn.style.background = 'rgba(255,255,255,0.05)';
+                    btn.style.borderColor = 'rgba(255,255,255,0.1)';
                 });
                 
-                colorPresets.appendChild(colorPreset);
+                this.style.background = colors.primary;
+                this.style.borderColor = colors.primary;
+                
+                const category = this.dataset.category;
+                filterVehicles(category);
             });
+        });
+    }
+    
+    function filterVehicles(category) {
+        const vehicleItems = document.querySelectorAll('.vehicle-item');
+        
+        vehicleItems.forEach(item => {
+            if (category === 'all' || item.dataset.category === category) {
+                item.style.display = 'block';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    }
+    
+    // ==============================
+    // COLOR SELECTOR FUNCTIONS
+    // ==============================
+    
+    function initColorPalette() {
+        const gtaColors = [
+            { name: "Metallic Red", value: "#ff0000" },
+            { name: "Metallic Blue", value: "#0066cc" },
+            { name: "Metallic Black", value: "#0a0a0a" },
+            { name: "Metallic White", value: "#ffffff" },
+            { name: "Metallic Green", value: "#00aa55" },
+            { name: "Matte Black", value: "#111111" },
+            { name: "Matte Gray", value: "#444444" },
+            { name: "Chrome", value: "#aaaaaa" }
+        ];
+        
+        const colorPresets = document.getElementById('colorPresets');
+        if (!colorPresets) return;
+        
+        colorPresets.innerHTML = '';
+        
+        gtaColors.forEach((color, index) => {
+            const colorPreset = document.createElement('div');
+            colorPreset.className = 'color-preset';
+            colorPreset.style.background = color.value;
+            colorPreset.style.width = '40px';
+            colorPreset.style.height = '40px';
+            colorPreset.style.borderRadius = '10px';
+            colorPreset.style.cursor = 'pointer';
+            colorPreset.title = color.name;
             
-            // Setup color pickers
-            document.getElementById('primaryColorPicker').addEventListener('input', function() {
+            if (index === 0) {
+                colorPreset.style.border = '2px solid white';
+                colorPreset.style.boxShadow = '0 0 10px rgba(255,255,255,0.5)';
+            }
+            
+            colorPreset.addEventListener('click', function() {
+                document.querySelectorAll('.color-preset').forEach(p => {
+                    p.style.border = 'none';
+                    p.style.boxShadow = 'none';
+                });
+                
+                this.style.border = '2px solid white';
+                this.style.boxShadow = '0 0 10px rgba(255,255,255,0.5)';
+                
+                const primaryColorPicker = document.getElementById('primaryColorPicker');
                 const primaryColorHex = document.getElementById('primaryColorHex');
                 const summaryPrimaryDot = document.getElementById('summaryPrimaryDot');
                 
-                if (primaryColorHex) primaryColorHex.value = this.value;
-                if (summaryPrimaryDot) summaryPrimaryDot.style.background = this.value;
+                if (primaryColorPicker) primaryColorPicker.value = color.value;
+                if (primaryColorHex) primaryColorHex.value = color.value;
+                if (summaryPrimaryDot) summaryPrimaryDot.style.background = color.value;
             });
             
-            document.getElementById('secondaryColorPicker').addEventListener('input', function() {
-                const secondaryColorHex = document.getElementById('secondaryColorHex');
-                const summarySecondaryDot = document.getElementById('summarySecondaryDot');
-                
-                if (secondaryColorHex) secondaryColorHex.value = this.value;
-                if (summarySecondaryDot) summarySecondaryDot.style.background = this.value;
-            });
+            colorPresets.appendChild(colorPreset);
+        });
+        
+        document.getElementById('primaryColorPicker').addEventListener('input', function() {
+            const primaryColorHex = document.getElementById('primaryColorHex');
+            const summaryPrimaryDot = document.getElementById('summaryPrimaryDot');
             
-            document.getElementById('pearlColorPicker').addEventListener('input', function() {
-                const pearlColorHex = document.getElementById('pearlColorHex');
-                const summaryPearlDot = document.getElementById('summaryPearlDot');
-                
-                if (pearlColorHex) pearlColorHex.value = this.value;
-                if (summaryPearlDot) summaryPearlDot.style.background = this.value;
+            if (primaryColorHex) primaryColorHex.value = this.value;
+            if (summaryPrimaryDot) summaryPrimaryDot.style.background = this.value;
+        });
+        
+        document.getElementById('secondaryColorPicker').addEventListener('input', function() {
+            const secondaryColorHex = document.getElementById('secondaryColorHex');
+            const summarySecondaryDot = document.getElementById('summarySecondaryDot');
+            
+            if (secondaryColorHex) secondaryColorHex.value = this.value;
+            if (summarySecondaryDot) summarySecondaryDot.style.background = this.value;
+        });
+        
+        document.getElementById('pearlColorPicker').addEventListener('input', function() {
+            const pearlColorHex = document.getElementById('pearlColorHex');
+            const summaryPearlDot = document.getElementById('summaryPearlDot');
+            
+            if (pearlColorHex) pearlColorHex.value = this.value;
+            if (summaryPearlDot) summaryPearlDot.style.background = this.value;
+        });
+    }
+    
+    // ==============================
+    // EVENT LISTENERS
+    // ==============================
+    
+    function setupEventListeners() {
+        document.getElementById('submitOrderBtn').addEventListener('click', function() {
+            const vehicleName = document.getElementById('vehicleNameDisplay').textContent;
+            const vehiclePrice = document.getElementById('vehiclePriceDisplay').textContent;
+            
+            showMessage('success', `Order submitted for ${vehicleName}! Price: ${vehiclePrice}`);
+            
+            document.getElementById('countdownTimer').style.display = 'block';
+            startCountdown();
+            
+            this.disabled = true;
+            setTimeout(() => {
+                this.disabled = false;
+            }, 5000);
+        });
+        
+        document.getElementById('resetFormBtn').addEventListener('click', function() {
+            document.getElementById('specialRequests').value = '';
+            showMessage('info', 'Form reset successfully');
+        });
+        
+        document.getElementById('cancelOrderBtn').addEventListener('click', function() {
+            document.getElementById('countdownTimer').style.display = 'none';
+            showMessage('warning', 'Order reservation cancelled');
+        });
+        
+        const addVehicleBtn = document.getElementById('addVehicleBtn');
+        if (addVehicleBtn) {
+            addVehicleBtn.addEventListener('click', function() {
+                showMessage('info', 'Add vehicle feature coming soon!');
             });
         }
         
-        // ==============================
-        // EVENT LISTENERS
-        // ==============================
+        addTestLoginButtons();
+    }
+    
+    function addTestLoginButtons() {
+        const loginContainer = document.querySelector('.login-container');
+        if (loginContainer && !document.getElementById('testLoginButtons')) {
+            const testButtons = document.createElement('div');
+            testButtons.id = 'testLoginButtons';
+            testButtons.style.marginTop = '20px';
+            testButtons.style.display = 'flex';
+            testButtons.style.flexDirection = 'column';
+            testButtons.style.gap = '10px';
+            
+            testButtons.innerHTML = `
+                <button class="btn btn-primary" onclick="simulateAuthCustomer()" style="width: 100%;">
+                    <i class="fas fa-user"></i> Test as Customer
+                </button>
+                <button class="btn" onclick="simulateAuthManager()" style="width: 100%; background: rgba(0,168,255,0.2); border: 1px solid #00a8ff; color: #00a8ff;">
+                    <i class="fas fa-user-tie"></i> Test as Manager
+                </button>
+                <button class="btn" onclick="simulateAuthOwner()" style="width: 100%; background: rgba(255,215,0,0.2); border: 1px solid #ffd700; color: #ffd700;">
+                    <i class="fas fa-crown"></i> Test as Owner
+                </button>
+            `;
+            
+            loginContainer.appendChild(testButtons);
+        }
+    }
+    
+    // ==============================
+    // COUNTDOWN TIMER
+    // ==============================
+    
+    let countdownInterval = null;
+    let remainingTime = 600;
+    
+    function startCountdown() {
+        remainingTime = 600;
+        updateTimerDisplay();
         
-        function setupEventListeners() {
-            // Order submission
-            document.getElementById('submitOrderBtn').addEventListener('click', function() {
-                const vehicleName = document.getElementById('vehicleNameDisplay').textContent;
-                const vehiclePrice = document.getElementById('vehiclePriceDisplay').textContent;
-                
-                showMessage('success', `Order submitted for ${vehicleName}! Price: ${vehiclePrice}`);
-                
-                // Show countdown timer
-                document.getElementById('countdownTimer').style.display = 'block';
-                startCountdown();
-                
-                // Disable submit button temporarily
-                this.disabled = true;
-                setTimeout(() => {
-                    this.disabled = false;
-                }, 5000);
-            });
-            
-            // Reset form
-            document.getElementById('resetFormBtn').addEventListener('click', function() {
-                document.getElementById('specialRequests').value = '';
-                showMessage('info', 'Form reset successfully');
-            });
-            
-            // Cancel order
-            document.getElementById('cancelOrderBtn').addEventListener('click', function() {
-                document.getElementById('countdownTimer').style.display = 'none';
-                showMessage('warning', 'Order reservation cancelled');
-            });
-            
-            // Add vehicle button (admin)
-            const addVehicleBtn = document.getElementById('addVehicleBtn');
-            if (addVehicleBtn) {
-                addVehicleBtn.addEventListener('click', function() {
-                    showMessage('info', 'Add vehicle feature coming soon!');
-                });
-            }
-            
-            // Add test login button to login screen
-            addTestLoginButton();
+        if (countdownInterval) {
+            clearInterval(countdownInterval);
         }
         
-        function addTestLoginButton() {
-            const loginContainer = document.querySelector('.login-container');
-            if (loginContainer && !document.getElementById('testLoginBtn')) {
-                const testBtn = document.createElement('button');
-                testBtn.id = 'testLoginBtn';
-                testBtn.className = 'btn btn-primary';
-                testBtn.style.marginTop = '20px';
-                testBtn.style.width = '100%';
-                testBtn.innerHTML = '<i class="fas fa-user"></i> Test Login (Skip Discord)';
-                testBtn.onclick = simulateAuth;
-                
-                loginContainer.appendChild(testBtn);
-            }
-        }
-        
-        // ==============================
-        // COUNTDOWN TIMER
-        // ==============================
-        
-        let countdownInterval = null;
-        let remainingTime = 600; // 10 minutes in seconds
-        
-        function startCountdown() {
-            remainingTime = 600;
-            
+        countdownInterval = setInterval(() => {
+            remainingTime--;
             updateTimerDisplay();
             
-            if (countdownInterval) {
+            if (remainingTime <= 0) {
                 clearInterval(countdownInterval);
+                document.getElementById('submitOrderBtn').disabled = false;
+                document.getElementById('countdownTimer').style.display = 'none';
+                showMessage('warning', 'Reservation expired');
             }
-            
-            countdownInterval = setInterval(() => {
-                remainingTime--;
-                updateTimerDisplay();
-                
-                if (remainingTime <= 0) {
-                    clearInterval(countdownInterval);
-                    document.getElementById('submitOrderBtn').disabled = false;
-                    document.getElementById('countdownTimer').style.display = 'none';
-                    showMessage('warning', 'Reservation expired');
-                }
-            }, 1000);
-        }
-        
-        function updateTimerDisplay() {
-            const minutes = Math.floor(remainingTime / 60);
-            const seconds = remainingTime % 60;
-            
-            document.getElementById('minutes').textContent = minutes.toString().padStart(2, '0');
-            document.getElementById('seconds').textContent = seconds.toString().padStart(2, '0');
-        }
-        
-        // ==============================
-        // STATUS MESSAGES
-        // ==============================
-        
-        function showMessage(type, text) {
-            const messageEl = document.getElementById('statusMessage');
-            if (!messageEl) return;
-            
-            let icon, color;
-            switch(type) {
-                case 'success':
-                    icon = 'check-circle';
-                    color = colors.success;
-                    break;
-                case 'error':
-                    icon = 'exclamation-circle';
-                    color = colors.danger;
-                    break;
-                case 'warning':
-                    icon = 'exclamation-triangle';
-                    color = colors.warning;
-                    break;
-                default:
-                    icon = 'info-circle';
-                    color = colors.accent;
-            }
-            
-            messageEl.innerHTML = `
-                <i class="fas fa-${icon}" style="font-size: 28px; color: ${color};"></i>
-                <div>
-                    <strong style="font-size: 18px;">${type.charAt(0).toUpperCase() + type.slice(1)}</strong><br>
-                    <span style="font-size: 14px; color: ${colors.textGray};">${text}</span>
-                </div>
-            `;
-            messageEl.className = `status-message status-${type}`;
-            messageEl.style.display = 'flex';
-            
-            setTimeout(() => {
-                messageEl.style.display = 'none';
-            }, 3000);
-        }
-        
-        // ==============================
-        // MAIN INITIALIZATION
-        // ==============================
-        
-        // Initialize application when DOM is loaded
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('=== GTA V DEALERSHIP INITIALIZATION ===');
-            
-            // Check if we have an auth code in the URL (from Discord redirect)
-            const hasAuthCode = checkForAuthCode();
-            
-            // Check if user is already authenticated
-            const isAuthenticated = checkAuth();
-            
-            console.log('Authentication status:', {
-                hasAuthCode: hasAuthCode,
-                isAuthenticated: isAuthenticated,
-                currentUser: currentUser
-            });
-            
-            if (isAuthenticated) {
-                // User is authenticated, show main app
-                console.log('Showing main application for authenticated user');
-                showMainApplication();
-            } else {
-                // User not authenticated, show login screen
-                console.log('Showing login screen');
-                document.getElementById('discordLoginSection').style.display = 'flex';
-                document.getElementById('mainApp').style.display = 'none';
-                initDiscordLogin();
-            }
-            
-            // Setup logout button if it exists
-            const logoutBtn = document.getElementById('logoutBtn');
-            if (logoutBtn) {
-                logoutBtn.addEventListener('click', logout);
-            }
-            
-            // Make simulateAuth available globally for test button
-            window.simulateAuth = simulateAuth;
-            
-            console.log('=== INITIALIZATION COMPLETE ===');
-        });
-    </script>
+        }, 1000);
+    }
     
-    <!-- Debug script -->
-    <script>
-        // Debug information
-        console.log('Page loaded successfully');
-        console.log('LocalStorage auth check:', {
-            token: localStorage.getItem('gta_dealership_token'),
-            user: localStorage.getItem('gta_dealership_user'),
-            role: localStorage.getItem('gta_dealership_role')
+    function updateTimerDisplay() {
+        const minutes = Math.floor(remainingTime / 60);
+        const seconds = remainingTime % 60;
+        
+        document.getElementById('minutes').textContent = minutes.toString().padStart(2, '0');
+        document.getElementById('seconds').textContent = seconds.toString().padStart(2, '0');
+    }
+    
+    // ==============================
+    // STATUS MESSAGES
+    // ==============================
+    
+    function showMessage(type, text) {
+        const messageEl = document.getElementById('statusMessage');
+        if (!messageEl) return;
+        
+        let icon, color;
+        switch(type) {
+            case 'success':
+                icon = 'check-circle';
+                color = colors.success;
+                break;
+            case 'error':
+                icon = 'exclamation-circle';
+                color = colors.danger;
+                break;
+            case 'warning':
+                icon = 'exclamation-triangle';
+                color = colors.warning;
+                break;
+            default:
+                icon = 'info-circle';
+                color = colors.accent;
+        }
+        
+        messageEl.innerHTML = `
+            <i class="fas fa-${icon}" style="font-size: 28px; color: ${color};"></i>
+            <div>
+                <strong style="font-size: 18px;">${type.charAt(0).toUpperCase() + type.slice(1)}</strong><br>
+                <span style="font-size: 14px; color: ${colors.textGray};">${text}</span>
+            </div>
+        `;
+        messageEl.className = `status-message status-${type}`;
+        messageEl.style.display = 'flex';
+        
+        setTimeout(() => {
+            messageEl.style.display = 'none';
+        }, 3000);
+    }
+    
+    // ==============================
+    // MAIN INITIALIZATION
+    // ==============================
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('=== GTA V DEALERSHIP INITIALIZATION ===');
+        
+        const hasAuthCode = checkForAuthCode();
+        const isAuthenticated = checkAuth();
+        
+        console.log('Authentication status:', {
+            hasAuthCode: hasAuthCode,
+            isAuthenticated: isAuthenticated,
+            currentUser: currentUser,
+            userRole: userRole
         });
         
-        // Auto-login for testing (can be removed in production)
-        // Uncomment to automatically login when page loads
-        /*
-        setTimeout(function() {
-            if (!localStorage.getItem('gta_dealership_token')) {
-                console.log('Auto-login for testing...');
-                simulateAuth();
-            }
-        }, 500);
-        */
-    </script>
+        if (isAuthenticated) {
+            console.log('Showing main application for authenticated user');
+            showMainApplication();
+        } else {
+            console.log('Showing login screen');
+            document.getElementById('discordLoginSection').style.display = 'flex';
+            document.getElementById('mainApp').style.display = 'none';
+            initDiscordLogin();
+        }
+        
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', logout);
+        }
+        
+        // Make functions available globally
+        window.simulateAuthCustomer = simulateAuthCustomer;
+        window.simulateAuthManager = simulateAuthManager;
+        window.simulateAuthOwner = simulateAuthOwner;
+        window.approveOrder = approveOrder;
+        window.rejectOrder = rejectOrder;
+        window.deliverOrder = deliverOrder;
+        
+        console.log('=== INITIALIZATION COMPLETE ===');
+    });
+</script>
 </body>
 </html>
