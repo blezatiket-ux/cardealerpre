@@ -15,6 +15,9 @@
             justify-content: center;
             align-items: center;
             height: 100vh;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(255, 68, 0, 0.05) 0%, transparent 20%),
+                radial-gradient(circle at 90% 80%, rgba(0, 168, 255, 0.05) 0%, transparent 20%);
         }
         
         .auth-container {
@@ -56,6 +59,14 @@
             margin: 10px 0;
         }
         
+        .success {
+            color: #00ff88;
+            background: rgba(0, 255, 136, 0.1);
+            padding: 10px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        
         .error {
             color: #ff4757;
             background: rgba(255, 71, 87, 0.1);
@@ -68,47 +79,115 @@
 <body>
     <div class="auth-container">
         <div class="spinner"></div>
-        <h2>Authenticating...</h2>
-        <p>Completing Discord authentication</p>
-        <p id="status">Processing authorization code...</p>
-        <div id="error" class="error" style="display: none;"></div>
+        <h2>Discord Authentication</h2>
+        <p id="status">Processing authentication...</p>
+        <div id="message" style="display: none;"></div>
     </div>
 
     <script>
-        // Get the authorization code from URL
-        const urlParams = new URLSearchParams(window.location.search);
-        const code = urlParams.get('code');
-        const error = urlParams.get('error');
-        const errorDescription = urlParams.get('error_description');
-        
-        const statusEl = document.getElementById('status');
-        const errorEl = document.getElementById('error');
-        
-        if (error) {
-            statusEl.textContent = 'Authentication Failed';
-            errorEl.textContent = `${error}: ${errorDescription || 'Unknown error'}`;
-            errorEl.style.display = 'block';
-            
-            setTimeout(() => {
-                window.location.href = '/';
-            }, 3000);
-        } else if (code) {
-            statusEl.textContent = 'Success! Redirecting to dealership...';
-            
-            // Store the code in localStorage and redirect to main page
-            localStorage.setItem('discord_auth_code', code);
-            
-            // Small delay to show success message
-            setTimeout(() => {
-                window.location.href = '/';
-            }, 1500);
-        } else {
-            statusEl.textContent = 'No authorization code found. Redirecting to login...';
-            
-            setTimeout(() => {
-                window.location.href = '/';
-            }, 2000);
+        async function exchangeCodeForToken(code) {
+            try {
+                // Exchange the authorization code for an access token
+                const response = await fetch('/.netlify/functions/discord-auth', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ code: code })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                return data;
+            } catch (error) {
+                console.error('Token exchange failed:', error);
+                throw error;
+            }
         }
+
+        async function handleAuthentication() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get('code');
+            const error = urlParams.get('error');
+            const errorDescription = urlParams.get('error_description');
+            
+            const statusEl = document.getElementById('status');
+            const messageEl = document.getElementById('message');
+            
+            if (error) {
+                // Discord returned an error
+                statusEl.textContent = 'Authentication Failed';
+                messageEl.textContent = `${error}: ${errorDescription || 'Unknown error'}`;
+                messageEl.className = 'error';
+                messageEl.style.display = 'block';
+                
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 3000);
+                return;
+            }
+            
+            if (!code) {
+                // No code in URL
+                statusEl.textContent = 'No authorization code found';
+                messageEl.textContent = 'Redirecting to login page...';
+                messageEl.className = 'error';
+                messageEl.style.display = 'block';
+                
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 2000);
+                return;
+            }
+            
+            try {
+                // We have a code, exchange it for a token
+                statusEl.textContent = 'Exchanging authorization code...';
+                
+                const authData = await exchangeCodeForToken(code);
+                
+                // Store authentication data
+                localStorage.setItem('gta_dealership_token', authData.token);
+                localStorage.setItem('gta_dealership_user', JSON.stringify(authData.user));
+                localStorage.setItem('gta_dealership_role', authData.role || 'customer');
+                localStorage.setItem('gta_dealership_authenticated', 'true');
+                
+                // Success message
+                statusEl.textContent = 'Authentication Successful!';
+                messageEl.textContent = `Welcome, ${authData.user.username}! Redirecting to dealership...`;
+                messageEl.className = 'success';
+                messageEl.style.display = 'block';
+                
+                // Redirect to main app
+                setTimeout(() => {
+                    // Remove the code from URL to prevent re-use
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                    window.location.href = '/';
+                }, 1500);
+                
+            } catch (error) {
+                console.error('Authentication error:', error);
+                statusEl.textContent = 'Authentication Failed';
+                messageEl.textContent = `Error: ${error.message || 'Failed to authenticate with Discord'}`;
+                messageEl.className = 'error';
+                messageEl.style.display = 'block';
+                
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 3000);
+            }
+        }
+
+        // Start authentication process
+        document.addEventListener('DOMContentLoaded', handleAuthentication);
     </script>
 </body>
 </html>
