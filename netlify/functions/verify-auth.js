@@ -1,36 +1,48 @@
-const jwt = require('jsonwebtoken');
-
 exports.handler = async (event) => {
-  const authHeader = event.headers.authorization;
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return {
-      statusCode: 401,
-      body: JSON.stringify({ error: 'No token provided' })
-    };
-  }
-  
-  const token = authHeader.split(' ')[1];
-  
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (event.httpMethod !== 'GET') {
+        return {
+            statusCode: 405,
+            body: JSON.stringify({ error: 'Method Not Allowed' })
+        };
+    }
     
-    return {
-      statusCode: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
-      },
-      body: JSON.stringify({
-        user: decoded,
-        role: decoded.role
-      })
-    };
-    
-  } catch (error) {
-    return {
-      statusCode: 401,
-      body: JSON.stringify({ error: 'Invalid token' })
-    };
-  }
+    try {
+        const authHeader = event.headers.authorization;
+        
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return {
+                statusCode: 401,
+                body: JSON.stringify({ error: 'No token provided' })
+            };
+        }
+        
+        const token = authHeader.split(' ')[1];
+        
+        // Decode the simple token
+        const tokenData = JSON.parse(Buffer.from(token, 'base64').toString());
+        
+        // Check if token is expired
+        if (tokenData.exp < Date.now()) {
+            return {
+                statusCode: 401,
+                body: JSON.stringify({ error: 'Token expired' })
+            };
+        }
+        
+        return {
+            statusCode: 200,
+            body: JSON.stringify({
+                userId: tokenData.userId,
+                role: tokenData.role,
+                valid: true
+            })
+        };
+        
+    } catch (error) {
+        console.error('Verify auth error:', error);
+        return {
+            statusCode: 401,
+            body: JSON.stringify({ error: 'Invalid token' })
+        };
+    }
 };

@@ -921,7 +921,7 @@
     <div class="status-message" id="statusMessage"></div>
 
     <!-- Main JavaScript -->
-    <script>
+ <script>
     // ==============================
     // APPLICATION CONFIGURATION
     // ==============================
@@ -929,7 +929,10 @@
     // Discord OAuth Configuration
     const DISCORD_CLIENT_ID = '1449863144712179885';
     const REDIRECT_URI = 'https://bright-profiterole-76ddbc.netlify.app/auth-callback.html';
-    const DISCORD_OAUTH_URL = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=identify%20guilds%20guilds.members.read`;
+    const API_BASE_URL = 'https://bright-profiterole-76ddbc.netlify.app/.netlify/functions';
+    
+    // Discord OAuth URL with proper scopes for role checking
+    const DISCORD_OAUTH_URL = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=identify%20guilds%20guilds.members.read&prompt=none`;
     
     // Color definitions
     const colors = {
@@ -952,35 +955,54 @@
     // Application State
     let currentUser = null;
     let userRole = null;
+    let authToken = null;
     
     // ==============================
-    // AUTHENTICATION FUNCTIONS
+    // REAL DISCORD AUTHENTICATION
     // ==============================
     
-    // Check if user is authenticated
-    function checkAuth() {
+    // Check if user is already authenticated
+    async function checkAuth() {
         const token = localStorage.getItem('gta_dealership_token');
         const userData = localStorage.getItem('gta_dealership_user');
         
-        console.log('Checking auth...');
+        console.log('Checking authentication...');
         
-        if (token && userData) {
-            try {
+        if (!token || !userData) {
+            console.log('No token or user data found');
+            return false;
+        }
+        
+        try {
+            // Verify token with backend
+            const response = await fetch(`${API_BASE_URL}/verify-auth`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
                 currentUser = JSON.parse(userData);
-                userRole = localStorage.getItem('gta_dealership_role') || 'customer';
+                userRole = data.role;
+                authToken = token;
                 
                 console.log('User authenticated:', {
                     username: currentUser.username,
-                    role: userRole
+                    role: userRole,
+                    id: currentUser.id
                 });
                 
                 return true;
-            } catch (e) {
-                console.error('Error parsing user data:', e);
+            } else {
+                console.log('Token invalid, clearing storage');
+                clearAuthData();
                 return false;
             }
+        } catch (error) {
+            console.error('Auth check failed:', error);
+            return false;
         }
-        return false;
     }
     
     // Initialize Discord Login
@@ -996,15 +1018,15 @@
     
     // Show main application
     function showMainApplication() {
-        console.log('Showing main application...');
+        console.log('Showing main application for:', currentUser.username);
         
         document.getElementById('discordLoginSection').style.display = 'none';
         document.getElementById('mainApp').style.display = 'block';
         
-        // Update user profile
+        // Update user profile with Discord data
         updateUserProfile();
         
-        // Setup UI based on role
+        // Setup UI based on REAL Discord role
         setupRoleBasedUI();
         
         // Initialize other features
@@ -1012,11 +1034,11 @@
         initColorPalette();
         setupEventListeners();
         
-        // Show welcome message
-        showMessage('success', `Welcome back, ${currentUser.username}! (${userRole.toUpperCase()})`);
+        // Show welcome message with role
+        showMessage('success', `Welcome ${currentUser.username}! Role: ${userRole.toUpperCase()}`);
     }
     
-    // Update user profile display
+    // Update user profile with Discord data
     function updateUserProfile() {
         if (!currentUser) return;
         
@@ -1024,60 +1046,76 @@
         const nameEl = document.getElementById('userName');
         const roleEl = document.getElementById('userRole');
         
-        // Set avatar
-        avatarEl.innerHTML = '<i class="fas fa-user"></i>';
-        avatarEl.style.background = `linear-gradient(135deg, ${colors.primary}, ${colors.accent})`;
+        // Set Discord avatar if available
+        if (currentUser.avatar) {
+            const avatarUrl = `https://cdn.discordapp.com/avatars/${currentUser.id}/${currentUser.avatar}.png?size=128`;
+            avatarEl.innerHTML = '';
+            avatarEl.style.backgroundImage = `url('${avatarUrl}')`;
+            avatarEl.style.backgroundSize = 'cover';
+            avatarEl.style.backgroundPosition = 'center';
+        } else {
+            avatarEl.innerHTML = '<i class="fas fa-user"></i>';
+            avatarEl.style.background = `linear-gradient(135deg, ${colors.primary}, ${colors.accent})`;
+        }
         
-        // Set name and role
-        nameEl.textContent = currentUser.username || 'Discord User';
+        // Set Discord username and role
+        const displayName = currentUser.global_name || currentUser.username || 'Discord User';
+        nameEl.textContent = displayName;
         roleEl.textContent = userRole.charAt(0).toUpperCase() + userRole.slice(1);
         
-        // Set role color
+        // Set role color based on Discord role
         switch(userRole.toLowerCase()) {
             case 'owner':
                 roleEl.style.color = '#ffd700';
+                roleEl.innerHTML += ' <i class="fas fa-crown"></i>';
                 break;
             case 'manager':
                 roleEl.style.color = '#00a8ff';
+                roleEl.innerHTML += ' <i class="fas fa-user-tie"></i>';
                 break;
             case 'customer':
                 roleEl.style.color = '#00ff88';
+                roleEl.innerHTML += ' <i class="fas fa-user"></i>';
                 break;
             default:
                 roleEl.style.color = colors.textGray;
         }
         
-        console.log('User profile updated:', { username: currentUser.username, role: userRole });
+        console.log('Profile updated with Discord data:', {
+            username: displayName,
+            role: userRole,
+            avatar: !!currentUser.avatar
+        });
     }
     
-    // Setup UI based on user role
+    // Setup UI based on REAL Discord role
     function setupRoleBasedUI() {
         const adminPanel = document.getElementById('adminPanel');
         const purchaseHistory = document.getElementById('purchaseHistory');
         
-        console.log('Setting up UI for role:', userRole);
+        console.log('Setting up UI for Discord role:', userRole);
         
         // Hide both by default
         if (adminPanel) adminPanel.style.display = 'none';
         if (purchaseHistory) purchaseHistory.style.display = 'none';
         
-        // Show based on role
+        // Show based on Discord role
         if (userRole === 'owner' || userRole === 'manager') {
-            console.log('Showing admin panel for', userRole);
+            console.log('Showing admin panel for Discord', userRole);
             if (adminPanel) {
                 adminPanel.style.display = 'block';
                 setupAdminPanel();
             }
             if (purchaseHistory) purchaseHistory.style.display = 'block';
         } else if (userRole === 'customer') {
-            console.log('Showing customer UI');
+            console.log('Showing customer UI for Discord customer');
             if (purchaseHistory) purchaseHistory.style.display = 'block';
         }
     }
     
-    // Setup admin panel
+    // Setup admin panel with real data
     function setupAdminPanel() {
-        console.log('Setting up admin panel...');
+        console.log('Setting up admin panel for:', userRole);
         
         // Setup tab switching
         document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -1096,7 +1134,94 @@
             });
         });
         
-        // Add sample data to orders table
+        // Load real admin data
+        loadAdminData();
+    }
+    
+    // Load real admin data
+    async function loadAdminData() {
+        if (userRole !== 'owner' && userRole !== 'manager') return;
+        
+        try {
+            // Load orders
+            const ordersResponse = await fetch(`${API_BASE_URL}/admin/orders`, {
+                headers: {
+                    'Authorization': `Bearer ${authToken}`
+                }
+            });
+            
+            if (ordersResponse.ok) {
+                const orders = await ordersResponse.json();
+                renderOrdersTable(orders);
+            }
+            
+        } catch (error) {
+            console.error('Failed to load admin data:', error);
+            // Fallback to sample data
+            renderSampleAdminData();
+        }
+    }
+    
+    // Render orders table
+    function renderOrdersTable(orders) {
+        const ordersTable = document.getElementById('ordersTable');
+        if (!ordersTable) return;
+        
+        if (!orders || orders.length === 0) {
+            ordersTable.innerHTML = '<p style="text-align: center; color: ' + colors.textGray + ';">No orders found.</p>';
+            return;
+        }
+        
+        let html = `
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Order ID</th>
+                        <th>Customer</th>
+                        <th>Vehicle</th>
+                        <th>Price</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        
+        orders.forEach(order => {
+            const date = new Date(order.created_at).toLocaleDateString();
+            const statusClass = order.status || 'pending';
+            
+            html += `
+                <tr>
+                    <td>${order.id.slice(0, 8)}...</td>
+                    <td>${order.customer_name || 'Unknown'}</td>
+                    <td>${order.vehicle_name}</td>
+                    <td>$${order.price.toLocaleString()}</td>
+                    <td><span class="status-badge status-${statusClass}">${statusClass}</span></td>
+                    <td>${date}</td>
+                    <td>
+                        <div style="display: flex; gap: 5px;">
+                            ${userRole === 'owner' || userRole === 'manager' ? `
+                                <button class="btn-approve" data-id="${order.id}" onclick="updateOrderStatus('${order.id}', 'approved')" style="background: rgba(0,255,136,0.2); color: ${colors.success}; border: none; border-radius: 5px; padding: 5px 10px; cursor: pointer;">
+                                    <i class="fas fa-check"></i>
+                                </button>
+                                <button class="btn-reject" data-id="${order.id}" onclick="updateOrderStatus('${order.id}', 'rejected')" style="background: rgba(255,71,87,0.2); color: ${colors.danger}; border: none; border-radius: 5px; padding: 5px 10px; cursor: pointer;">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            ` : ''}
+                        </div>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        html += '</tbody></table>';
+        ordersTable.innerHTML = html;
+    }
+    
+    // Sample data fallback
+    function renderSampleAdminData() {
         const ordersTable = document.getElementById('ordersTable');
         if (ordersTable) {
             ordersTable.innerHTML = `
@@ -1115,180 +1240,111 @@
                     <tbody>
                         <tr>
                             <td>ORD001</td>
-                            <td>John_Doe</td>
+                            <td>${currentUser.username || 'DiscordUser'}</td>
                             <td>Karin Sultan</td>
                             <td>$250,000</td>
                             <td><span class="status-badge status-pending">Pending</span></td>
-                            <td>2024-01-15</td>
+                            <td>${new Date().toLocaleDateString()}</td>
                             <td>
-                                <button class="btn-approve" onclick="approveOrder('ORD001')" style="background: rgba(0,255,136,0.2); color: ${colors.success}; border: none; border-radius: 5px; padding: 5px 10px; cursor: pointer; margin-right: 5px;">
+                                <button class="btn-approve" onclick="updateOrderStatus('ORD001', 'approved')" style="background: rgba(0,255,136,0.2); color: ${colors.success}; border: none; border-radius: 5px; padding: 5px 10px; cursor: pointer; margin-right: 5px;">
                                     <i class="fas fa-check"></i>
                                 </button>
-                                <button class="btn-reject" onclick="rejectOrder('ORD001')" style="background: rgba(255,71,87,0.2); color: ${colors.danger}; border: none; border-radius: 5px; padding: 5px 10px; cursor: pointer;">
+                                <button class="btn-reject" onclick="updateOrderStatus('ORD001', 'rejected')" style="background: rgba(255,71,87,0.2); color: ${colors.danger}; border: none; border-radius: 5px; padding: 5px 10px; cursor: pointer;">
                                     <i class="fas fa-times"></i>
                                 </button>
                             </td>
                         </tr>
-                        <tr>
-                            <td>ORD002</td>
-                            <td>Jane_Smith</td>
-                            <td>Bravado Buffalo</td>
-                            <td>$350,000</td>
-                            <td><span class="status-badge status-approved">Approved</span></td>
-                            <td>2024-01-14</td>
-                            <td>
-                                <button class="btn-deliver" onclick="deliverOrder('ORD002')" style="background: rgba(88,101,242,0.2); color: ${colors.accent}; border: none; border-radius: 5px; padding: 5px 10px; cursor: pointer;">
-                                    <i class="fas fa-truck"></i>
-                                </button>
-                            </td>
-                        </tr>
                     </tbody>
                 </table>
             `;
+        }
+    }
+    
+    // Update order status
+    async function updateOrderStatus(orderId, status) {
+        if (!authToken) {
+            showMessage('error', 'Not authenticated');
+            return;
         }
         
-        // Add sample data to vehicles table
-        const vehiclesTable = document.getElementById('vehiclesTable');
-        if (vehiclesTable) {
-            vehiclesTable.innerHTML = `
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Vehicle</th>
-                            <th>Price</th>
-                            <th>Category</th>
-                            <th>Stock</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td><strong>Karin Sultan</strong></td>
-                            <td>$250,000</td>
-                            <td>Sports Sedan</td>
-                            <td>5</td>
-                            <td>
-                                <button class="btn-edit" style="background: rgba(255,177,66,0.2); color: ${colors.warning}; border: none; border-radius: 5px; padding: 5px 10px; cursor: pointer; margin-right: 5px;">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button class="btn-delete" style="background: rgba(255,71,87,0.2); color: ${colors.danger}; border: none; border-radius: 5px; padding: 5px 10px; cursor: pointer;">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            `;
+        try {
+            const response = await fetch(`${API_BASE_URL}/admin/update-order`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${authToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ orderId, status })
+            });
+            
+            if (response.ok) {
+                showMessage('success', `Order ${status} successfully!`);
+                loadAdminData();
+            } else {
+                showMessage('error', 'Failed to update order');
+            }
+        } catch (error) {
+            console.error('Order update error:', error);
+            showMessage('info', `Order ${orderId} marked as ${status} (demo)`);
         }
     }
     
-    // Admin order functions
-    function approveOrder(orderId) {
-        showMessage('success', `Order ${orderId} approved!`);
-    }
-    
-    function rejectOrder(orderId) {
-        showMessage('warning', `Order ${orderId} rejected!`);
-    }
-    
-    function deliverOrder(orderId) {
-        showMessage('info', `Order ${orderId} marked as delivered!`);
+    // Clear authentication data
+    function clearAuthData() {
+        localStorage.removeItem('gta_dealership_token');
+        localStorage.removeItem('gta_dealership_user');
+        localStorage.removeItem('gta_dealership_role');
     }
     
     // Logout function
     function logout() {
-        localStorage.removeItem('gta_dealership_token');
-        localStorage.removeItem('gta_dealership_user');
-        localStorage.removeItem('gta_dealership_role');
+        clearAuthData();
         window.location.reload();
-    }
-    
-    // ==============================
-    // TEST AUTHENTICATION FUNCTIONS
-    // ==============================
-    
-    // Simulate authentication as CUSTOMER
-    function simulateAuthCustomer() {
-        console.log('Simulating authentication as Customer...');
-        
-        const mockUser = {
-            id: '123456789',
-            username: 'CustomerUser_' + Math.floor(Math.random() * 1000),
-            avatar: null,
-            discriminator: '0001'
-        };
-        
-        localStorage.setItem('gta_dealership_token', 'mock-token-' + Date.now());
-        localStorage.setItem('gta_dealership_user', JSON.stringify(mockUser));
-        localStorage.setItem('gta_dealership_role', 'customer');
-        
-        showMessage('success', 'Test login successful as Customer!');
-        
-        setTimeout(() => {
-            window.location.reload();
-        }, 1000);
-    }
-    
-    // Simulate authentication as MANAGER
-    function simulateAuthManager() {
-        console.log('Simulating authentication as Manager...');
-        
-        const mockUser = {
-            id: '987654321',
-            username: 'ManagerUser_' + Math.floor(Math.random() * 1000),
-            avatar: null,
-            discriminator: '0002'
-        };
-        
-        localStorage.setItem('gta_dealership_token', 'mock-token-' + Date.now());
-        localStorage.setItem('gta_dealership_user', JSON.stringify(mockUser));
-        localStorage.setItem('gta_dealership_role', 'manager');
-        
-        showMessage('success', 'Test login successful as Manager!');
-        
-        setTimeout(() => {
-            window.location.reload();
-        }, 1000);
-    }
-    
-    // Simulate authentication as OWNER
-    function simulateAuthOwner() {
-        console.log('Simulating authentication as Owner...');
-        
-        const mockUser = {
-            id: '555555555',
-            username: 'OwnerUser_' + Math.floor(Math.random() * 1000),
-            avatar: null,
-            discriminator: '0003'
-        };
-        
-        localStorage.setItem('gta_dealership_token', 'mock-token-' + Date.now());
-        localStorage.setItem('gta_dealership_user', JSON.stringify(mockUser));
-        localStorage.setItem('gta_dealership_role', 'owner');
-        
-        showMessage('success', 'Test login successful as Owner!');
-        
-        setTimeout(() => {
-            window.location.reload();
-        }, 1000);
     }
     
     // ==============================
     // CHECK FOR AUTH CODE IN URL
     // ==============================
     
-    function checkForAuthCode() {
+    async function checkForAuthCode() {
         const urlParams = new URLSearchParams(window.location.search);
         const code = urlParams.get('code');
         
         if (code) {
-            console.log('Found auth code in URL');
-            localStorage.setItem('discord_auth_code', code);
-            const newUrl = window.location.pathname;
-            window.history.replaceState({}, document.title, newUrl);
+            console.log('Found Discord OAuth code in URL');
             
-            // Simulate as manager for testing
-            simulateAuthManager();
+            try {
+                // Exchange code for token
+                const response = await fetch(`${API_BASE_URL}/discord-auth`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ code })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Store authentication data
+                    localStorage.setItem('gta_dealership_token', data.token);
+                    localStorage.setItem('gta_dealership_user', JSON.stringify(data.user));
+                    localStorage.setItem('gta_dealership_role', data.role);
+                    
+                    // Remove code from URL
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                    
+                    // Reload to show authenticated state
+                    window.location.reload();
+                } else {
+                    showMessage('error', data.error || 'Authentication failed');
+                    console.error('Auth error:', data);
+                }
+            } catch (error) {
+                console.error('OAuth exchange error:', error);
+                showMessage('error', 'Network error during authentication');
+            }
+            
             return true;
         }
         return false;
@@ -1536,19 +1592,51 @@
     // ==============================
     
     function setupEventListeners() {
-        document.getElementById('submitOrderBtn').addEventListener('click', function() {
+        document.getElementById('submitOrderBtn').addEventListener('click', async function() {
+            if (!authToken) {
+                showMessage('error', 'Please login first');
+                return;
+            }
+            
             const vehicleName = document.getElementById('vehicleNameDisplay').textContent;
             const vehiclePrice = document.getElementById('vehiclePriceDisplay').textContent;
+            const specialRequests = document.getElementById('specialRequests').value;
+            const paymentMethod = document.getElementById('paymentMethod').value;
             
-            showMessage('success', `Order submitted for ${vehicleName}! Price: ${vehiclePrice}`);
-            
-            document.getElementById('countdownTimer').style.display = 'block';
-            startCountdown();
-            
-            this.disabled = true;
-            setTimeout(() => {
-                this.disabled = false;
-            }, 5000);
+            try {
+                const response = await fetch(`${API_BASE_URL}/submit-order`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        vehicleName: vehicleName,
+                        price: parseInt(vehiclePrice.replace(/[^0-9]/g, '')),
+                        specialRequests: specialRequests,
+                        paymentMethod: paymentMethod,
+                        customerId: currentUser.id,
+                        customerName: currentUser.username
+                    })
+                });
+                
+                if (response.ok) {
+                    showMessage('success', `Order submitted for ${vehicleName}! Price: ${vehiclePrice}`);
+                    
+                    document.getElementById('countdownTimer').style.display = 'block';
+                    startCountdown();
+                    
+                    this.disabled = true;
+                    setTimeout(() => {
+                        this.disabled = false;
+                    }, 5000);
+                } else {
+                    showMessage('error', 'Failed to submit order');
+                }
+            } catch (error) {
+                console.error('Order submission error:', error);
+                showMessage('error', 'Network error. Please try again.');
+            }
         });
         
         document.getElementById('resetFormBtn').addEventListener('click', function() {
@@ -1566,34 +1654,6 @@
             addVehicleBtn.addEventListener('click', function() {
                 showMessage('info', 'Add vehicle feature coming soon!');
             });
-        }
-        
-        addTestLoginButtons();
-    }
-    
-    function addTestLoginButtons() {
-        const loginContainer = document.querySelector('.login-container');
-        if (loginContainer && !document.getElementById('testLoginButtons')) {
-            const testButtons = document.createElement('div');
-            testButtons.id = 'testLoginButtons';
-            testButtons.style.marginTop = '20px';
-            testButtons.style.display = 'flex';
-            testButtons.style.flexDirection = 'column';
-            testButtons.style.gap = '10px';
-            
-            testButtons.innerHTML = `
-                <button class="btn btn-primary" onclick="simulateAuthCustomer()" style="width: 100%;">
-                    <i class="fas fa-user"></i> Test as Customer
-                </button>
-                <button class="btn" onclick="simulateAuthManager()" style="width: 100%; background: rgba(0,168,255,0.2); border: 1px solid #00a8ff; color: #00a8ff;">
-                    <i class="fas fa-user-tie"></i> Test as Manager
-                </button>
-                <button class="btn" onclick="simulateAuthOwner()" style="width: 100%; background: rgba(255,215,0,0.2); border: 1px solid #ffd700; color: #ffd700;">
-                    <i class="fas fa-crown"></i> Test as Owner
-                </button>
-            `;
-            
-            loginContainer.appendChild(testButtons);
         }
     }
     
@@ -1679,27 +1739,32 @@
     // MAIN INITIALIZATION
     // ==============================
     
-    document.addEventListener('DOMContentLoaded', function() {
-        console.log('=== GTA V DEALERSHIP INITIALIZATION ===');
+    document.addEventListener('DOMContentLoaded', async function() {
+        console.log('=== GTA V DEALERSHIP - REAL DISCORD AUTH ===');
         
-        const hasAuthCode = checkForAuthCode();
-        const isAuthenticated = checkAuth();
+        // First check for Discord OAuth callback
+        const hasAuthCode = await checkForAuthCode();
         
-        console.log('Authentication status:', {
-            hasAuthCode: hasAuthCode,
-            isAuthenticated: isAuthenticated,
-            currentUser: currentUser,
-            userRole: userRole
-        });
-        
-        if (isAuthenticated) {
-            console.log('Showing main application for authenticated user');
-            showMainApplication();
-        } else {
-            console.log('Showing login screen');
-            document.getElementById('discordLoginSection').style.display = 'flex';
-            document.getElementById('mainApp').style.display = 'none';
-            initDiscordLogin();
+        if (!hasAuthCode) {
+            // Check if user is already authenticated
+            const isAuthenticated = await checkAuth();
+            
+            console.log('Authentication status:', {
+                hasAuthCode: hasAuthCode,
+                isAuthenticated: isAuthenticated,
+                currentUser: currentUser,
+                userRole: userRole
+            });
+            
+            if (isAuthenticated) {
+                console.log('Showing main application for authenticated Discord user');
+                showMainApplication();
+            } else {
+                console.log('Showing Discord login screen');
+                document.getElementById('discordLoginSection').style.display = 'flex';
+                document.getElementById('mainApp').style.display = 'none';
+                initDiscordLogin();
+            }
         }
         
         const logoutBtn = document.getElementById('logoutBtn');
@@ -1708,12 +1773,7 @@
         }
         
         // Make functions available globally
-        window.simulateAuthCustomer = simulateAuthCustomer;
-        window.simulateAuthManager = simulateAuthManager;
-        window.simulateAuthOwner = simulateAuthOwner;
-        window.approveOrder = approveOrder;
-        window.rejectOrder = rejectOrder;
-        window.deliverOrder = deliverOrder;
+        window.updateOrderStatus = updateOrderStatus;
         
         console.log('=== INITIALIZATION COMPLETE ===');
     });
