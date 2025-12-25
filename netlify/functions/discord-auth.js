@@ -37,11 +37,14 @@ exports.handler = async (event) => {
         
         const tokenData = await tokenResponse.json();
         
-        if (!tokenData.access_token) {
-            console.error('Token error:', tokenData);
+        if (!tokenResponse.ok || !tokenData.access_token) {
+            console.error('Discord token error:', tokenData);
             return {
                 statusCode: 401,
-                body: JSON.stringify({ error: 'Failed to get access token: ' + (tokenData.error_description || 'Unknown error') })
+                body: JSON.stringify({ 
+                    error: 'Failed to get access token',
+                    details: tokenData.error_description || 'Unknown error'
+                })
             };
         }
         
@@ -51,6 +54,13 @@ exports.handler = async (event) => {
                 Authorization: `Bearer ${tokenData.access_token}`
             }
         });
+        
+        if (!userResponse.ok) {
+            return {
+                statusCode: 401,
+                body: JSON.stringify({ error: 'Failed to get user info from Discord' })
+            };
+        }
         
         const userData = await userResponse.json();
         
@@ -73,13 +83,13 @@ exports.handler = async (event) => {
             return {
                 statusCode: 403,
                 body: JSON.stringify({ 
-                    error: 'Not a member of the required Discord server',
+                    error: 'You must be a member of our Discord server to access the dealership',
                     user: userData
                 })
             };
         }
         
-        // Get user's roles in your guild
+        // Get user's roles in your guild using BOT token
         const memberResponse = await fetch(`https://discord.com/api/guilds/${YOUR_GUILD_ID}/members/${userData.id}`, {
             headers: {
                 Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}`
@@ -87,36 +97,54 @@ exports.handler = async (event) => {
         });
         
         let userRole = 'customer'; // Default role
-        const memberData = await memberResponse.json();
         
-        if (memberData.roles && memberData.roles.length > 0) {
-            // Get role names from your Discord server
-            // You need to configure these role IDs in environment variables
-            const ROLE_IDS = {
-                owner: process.env.ROLE_OWNER_ID,
-                manager: process.env.ROLE_MANAGER_ID,
-                customer: process.env.ROLE_CUSTOMER_ID
-            };
+        if (memberResponse.ok) {
+            const memberData = await memberResponse.json();
             
-            // Check for specific role IDs
-            if (memberData.roles.includes(ROLE_IDS.owner)) {
-                userRole = 'owner';
-            } else if (memberData.roles.includes(ROLE_IDS.manager)) {
-                userRole = 'manager';
-            } else if (memberData.roles.includes(ROLE_IDS.customer)) {
-                userRole = 'customer';
+            if (memberData.roles && memberData.roles.length > 0) {
+                // Get role IDs from environment variables
+                const ROLE_IDS = {
+                    owner: process.env.ROLE_OWNER_ID,
+                    manager: process.env.ROLE_MANAGER_ID,
+                    customer: process.env.ROLE_CUSTOMER_ID
+                };
+                
+                // Check for specific role IDs (owner has highest priority)
+                if (ROLE_IDS.owner && memberData.roles.includes(ROLE_IDS.owner)) {
+                    userRole = 'owner';
+                } else if (ROLE_IDS.manager && memberData.roles.includes(ROLE_IDS.manager)) {
+                    userRole = 'manager';
+                } else if (ROLE_IDS.customer && memberData.roles.includes(ROLE_IDS.customer)) {
+                    userRole = 'customer';
+                } else {
+                    // User has roles but not the specific ones we're looking for
+                    userRole = 'member';
+                }
+            } else {
+                // User has no roles in the guild
+                userRole = 'guest';
             }
-            
-            // You can add more role checks as needed
+        } else {
+            console.error('Failed to get member data:', await memberResponse.text());
+            // Fallback to customer role if we can't fetch roles
+            userRole = 'customer';
         }
         
-        // Create a simple token (in production, use JWT)
-        const token = Buffer.from(JSON.stringify({
+        // Create a JWT-like token (in production, use a proper JWT library)
+        const tokenPayload = {
             userId: userData.id,
             username: userData.username,
+            discriminator: userData.discriminator,
+            avatar: userData.avatar,
+            global_name: userData.global_name,
             role: userRole,
+            guildId: YOUR_GUILD_ID,
+            iat: Date.now(),
             exp: Date.now() + (7 * 24 * 60 * 60 * 1000) // 7 days
-        })).toString('base64');
+        };
+        
+        // Base64 encode the token
+        const token = Buffer.from(JSON.stringify(tokenPayload)).toString('base64');
         
         return {
             statusCode: 200,
@@ -130,7 +158,8 @@ exports.handler = async (event) => {
                     global_name: userData.global_name
                 },
                 role: userRole,
-                guild: userGuild.name
+                guild: userGuild.name,
+                memberSince: new Date().toISOString()
             })
         };
         
@@ -138,7 +167,10 @@ exports.handler = async (event) => {
         console.error('Discord auth error:', error);
         return {
             statusCode: 500,
-            body: JSON.stringify({ error: 'Internal server error: ' + error.message })
+            body: JSON.stringify({ 
+                error: 'Internal server error',
+                message: error.message 
+            })
         };
     }
 };
