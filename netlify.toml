@@ -1,10 +1,11 @@
 [build]
-  functions = "functions"
-  publish = "."
+  publish = "./"
+  functions = "./netlify/functions"
+  command = "cd netlify/functions && npm install"
 
 [[redirects]]
-  from = "/.netlify/functions/*"
-  to = "/.netlify/functions/:splat"
+  from = "/auth-callback.html"
+  to = "/.netlify/functions/discord-auth"
   status = 200
 
 [[redirects]]
