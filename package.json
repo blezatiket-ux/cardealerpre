@@ -1,0 +1,15 @@
+{
+  "name": "gta-dealership-functions",
+  "version": "1.0.0",
+  "description": "Netlify functions for GTA V Dealership",
+  "main": "index.js",
+  "dependencies": {
+    "node-fetch": "^2.6.7",
+    "jsonwebtoken": "^9.0.0",
+    "@supabase/supabase-js": "^2.38.0",
+    "discord.js": "^14.14.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

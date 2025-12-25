@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authentication - GTA V Dealership</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .auth-container {
+            text-align: center;
+            padding: 40px;
+            background: rgba(15, 15, 20, 0.9);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 68, 0, 0.3);
+            backdrop-filter: blur(20px);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7);
+            max-width: 500px;
+            width: 90%;
+        }
+        
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-top: 4px solid #ff4400;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 30px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        h1 {
+            font-size: 28px;
+            margin-bottom: 15px;
+            background: linear-gradient(90deg, #ff4400, #5865F2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        p {
+            color: #b0b0c0;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+        
+        .error {
+            color: #ff4757;
+            padding: 15px;
+            background: rgba(255, 71, 87, 0.1);
+            border-radius: 10px;
+            margin-top: 20px;
+            display: none;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 12px 25px;
+            background: #5865F2;
+            color: white;
+            text-decoration: none;
+            border-radius: 10px;
+            font-weight: 600;
+            margin-top: 20px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn:hover {
+            background: #4752c4;
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <div class="spinner"></div>
+        <h1>Authenticating with Discord...</h1>
+        <p>Please wait while we verify your credentials and check your Discord roles.</p>
+        <div class="error" id="errorMessage"></div>
+    </div>
+    
+    <script>
+        // Get the authorization code from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+        
+        if (code) {
+            // Send the code to the parent window (main app)
+            window.opener.postMessage({
+                type: 'discord_auth_code',
+                code: code
+            }, window.location.origin);
+            
+            // Close this window after 1 second
+            setTimeout(() => {
+                window.close();
+            }, 1000);
+        } else {
+            // No code found, show error
+            document.getElementById('errorMessage').style.display = 'block';
+            document.getElementById('errorMessage').textContent = 'No authorization code found. Please try again.';
+            document.querySelector('.spinner').style.display = 'none';
+            document.querySelector('h1').textContent = 'Authentication Failed';
+            document.querySelector('p').innerHTML = '<a href="/" class="btn">Return to Login</a>';
+        }
+    </script>
+</body>
+</html>

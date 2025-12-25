@@ -1,0 +1,2001 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GTA V DEALERSHIP | Discord Integrated</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        /* ===== RESET & BASE STYLES ===== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #ff4400;
+            --primary-dark: #cc3300;
+            --secondary: #111111;
+            --accent: #5865F2;
+            --discord-blurple: #5865F2;
+            --discord-green: #57F287;
+            --discord-yellow: #FEE75C;
+            --discord-red: #ED4245;
+            --glass: rgba(15, 15, 20, 0.9);
+            --glass-border: rgba(255, 68, 0, 0.3);
+            --dark-bg: #0a0a0f;
+            --text-light: #ffffff;
+            --text-gray: #b0b0c0;
+            --success: #00ff88;
+            --warning: #ffb142;
+            --danger: #ff4757;
+            --shadow: 0 10px 40px rgba(0, 0, 0, 0.7);
+            --transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--dark-bg);
+            color: var(--text-light);
+            min-height: 100vh;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(255, 68, 0, 0.05) 0%, transparent 20%),
+                radial-gradient(circle at 90% 80%, rgba(0, 168, 255, 0.05) 0%, transparent 20%);
+        }
+
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* ===== DISCORD LOGIN SCREEN ===== */
+        .discord-login-section {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            padding: 20px;
+        }
+
+        .login-container {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 40px;
+            width: 100%;
+            max-width: 500px;
+            text-align: center;
+            box-shadow: var(--shadow);
+        }
+
+        .login-logo {
+            font-size: 60px;
+            color: var(--accent);
+            margin-bottom: 20px;
+        }
+
+        .login-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 32px;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .login-subtitle {
+            color: var(--text-gray);
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+
+        .role-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin: 30px 0;
+        }
+
+        .role-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 20px;
+            transition: var(--transition);
+        }
+
+        .role-card:hover {
+            transform: translateY(-5px);
+            background: rgba(255, 68, 0, 0.1);
+        }
+
+        .role-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 15px;
+            font-size: 24px;
+        }
+
+        .role-owner .role-icon { background: linear-gradient(135deg, #ffd700, #ffaa00); }
+        .role-manager .role-icon { background: linear-gradient(135deg, #00a8ff, #0097e6); }
+        .role-customer .role-icon { background: linear-gradient(135deg, #00ff88, #00cc6a); }
+
+        .role-name {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .role-desc {
+            font-size: 12px;
+            color: var(--text-gray);
+        }
+
+        /* ===== USER PROFILE ===== */
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 10px 20px;
+            min-width: 250px;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .user-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .user-info {
+            flex: 1;
+        }
+
+        .user-name {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 2px;
+        }
+
+        .user-role {
+            font-size: 12px;
+            color: var(--text-gray);
+            text-transform: capitalize;
+        }
+
+        .btn-logout {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-light);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .btn-logout:hover {
+            background: rgba(237, 66, 69, 0.2);
+            border-color: var(--discord-red);
+            color: var(--discord-red);
+        }
+
+        /* ===== ADMIN PANEL ===== */
+        .admin-panel {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: var(--shadow);
+        }
+
+        .admin-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 15px;
+        }
+
+        .tab-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 10px 20px;
+            color: var(--text-light);
+            font-size: 14px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .tab-btn:hover,
+        .tab-btn.active {
+            background: var(--primary);
+            border-color: var(--primary);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .data-table th {
+            text-align: left;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+            font-weight: 600;
+        }
+
+        .data-table td {
+            padding: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .data-table tr:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-pending { background: rgba(255, 177, 66, 0.2); color: var(--warning); }
+        .status-approved { background: rgba(0, 255, 136, 0.2); color: var(--success); }
+        .status-rejected { background: rgba(255, 71, 87, 0.2); color: var(--danger); }
+        .status-delivered { background: rgba(88, 101, 242, 0.2); color: var(--accent); }
+
+        /* ===== PURCHASE HISTORY ===== */
+        .purchase-history {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: var(--shadow);
+        }
+
+        /* ===== MAIN APP HEADER ===== */
+        header {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 25px 35px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: var(--shadow);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .logo-icon {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            width: 60px;
+            height: 60px;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            box-shadow: 0 8px 20px rgba(255, 68, 0, 0.3);
+        }
+
+        .logo-text h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 28px;
+            font-weight: 700;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 5px;
+        }
+
+        .tagline {
+            color: var(--text-gray);
+            font-size: 14px;
+            letter-spacing: 0.5px;
+        }
+
+        /* ===== VEHICLE VIEWER ===== */
+        .main-layout {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .viewer-section {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: var(--shadow);
+        }
+
+        #vehicle3dViewer {
+            width: 100%;
+            height: 500px;
+            background: rgba(10, 10, 15, 0.5);
+            border-radius: 15px;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.5);
+        }
+
+        /* ===== SIDEBAR ===== */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .vehicle-selector,
+        .color-selector,
+        .buyer-details,
+        .order-summary {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: var(--shadow);
+        }
+
+        /* ===== BUTTONS ===== */
+        .btn {
+            padding: 18px 25px;
+            border-radius: 15px;
+            border: none;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: var(--text-light);
+            box-shadow: 0 8px 20px rgba(255, 68, 0, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 25px rgba(255, 68, 0, 0.4);
+        }
+
+        .btn-discord {
+            background: linear-gradient(135deg, var(--discord-blurple), #4752c4);
+            color: white;
+            box-shadow: 0 8px 20px rgba(88, 101, 242, 0.3);
+        }
+
+        .btn-discord:hover {
+            background: linear-gradient(135deg, #4752c4, #3c45a5);
+            transform: translateY(-3px);
+            box-shadow: 0 12px 25px rgba(88, 101, 242, 0.4);
+        }
+
+        /* ===== COUNTDOWN TIMER ===== */
+        .countdown-timer {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            display: none;
+            text-align: center;
+            box-shadow: var(--shadow);
+        }
+
+        .timer-display {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin: 30px 0;
+        }
+
+        .timer-value {
+            font-size: 48px;
+            font-weight: 700;
+            font-family: 'Orbitron', sans-serif;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            line-height: 1;
+        }
+
+        /* ===== STATUS MESSAGES ===== */
+        .status-message {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 15px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            max-width: 400px;
+            box-shadow: var(--shadow);
+            z-index: 1000;
+            display: none;
+        }
+
+        .status-success {
+            border-left: 4px solid var(--success);
+        }
+
+        .status-error {
+            border-left: 4px solid var(--danger);
+        }
+
+        /* ===== RESPONSIVE DESIGN ===== */
+        @media (max-width: 1200px) {
+            .main-layout {
+                grid-template-columns: 1fr;
+            }
+            
+            .sidebar {
+                grid-template-columns: repeat(2, 1fr);
+                display: grid;
+                gap: 30px;
+            }
+            
+            .role-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            header {
+                flex-direction: column;
+                gap: 20px;
+                text-align: center;
+            }
+            
+            .user-profile {
+                width: 100%;
+                justify-content: center;
+            }
+            
+            .admin-tabs {
+                flex-direction: column;
+            }
+            
+            .data-table {
+                display: block;
+                overflow-x: auto;
+            }
+            
+            .timer-display {
+                gap: 15px;
+            }
+            
+            .timer-value {
+                font-size: 36px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Discord Login Screen -->
+    <section class="discord-login-section" id="discordLoginSection">
+        <div class="login-container">
+            <div class="login-logo">
+                <i class="fab fa-discord"></i>
+            </div>
+            <h1 class="login-title">GTA V DEALERSHIP</h1>
+            <p class="login-subtitle">Login with Discord to access the vehicle dealership. Your Discord roles determine your access level.</p>
+            
+            <button class="btn btn-discord" id="discordLoginBtn" style="width: 100%;">
+                <i class="fab fa-discord"></i> Login with Discord
+            </button>
+            
+            <div class="role-grid">
+                <div class="role-card role-owner">
+                    <div class="role-icon">
+                        <i class="fas fa-crown"></i>
+                    </div>
+                    <div class="role-name">Owner</div>
+                    <div class="role-desc">Full access to manage everything</div>
+                </div>
+                
+                <div class="role-card role-manager">
+                    <div class="role-icon">
+                        <i class="fas fa-user-tie"></i>
+                    </div>
+                    <div class="role-name">Manager</div>
+                    <div class="role-desc">Manage orders and inventory</div>
+                </div>
+                
+                <div class="role-card role-customer">
+                    <div class="role-icon">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="role-name">Customer</div>
+                    <div class="role-desc">Purchase vehicles & view history</div>
+                </div>
+            </div>
+            
+            <p style="color: var(--text-gray); font-size: 12px; margin-top: 30px;">
+                <i class="fas fa-info-circle"></i> You must be a member of our Discord server to login
+            </p>
+        </div>
+    </section>
+
+    <!-- Main Application (Hidden until logged in) -->
+    <div class="container" id="mainApp" style="display: none;">
+        <!-- Header with User Profile -->
+        <header>
+            <div class="logo">
+                <div class="logo-icon">
+                    <i class="fas fa-car"></i>
+                </div>
+                <div class="logo-text">
+                    <h1>GTA V DEALERSHIP</h1>
+                    <div class="tagline">Real Vehicle Models • Discord Integration • FiveM Ready</div>
+                </div>
+            </div>
+            
+            <div class="user-profile" id="userProfile">
+                <div class="user-avatar" id="userAvatar">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="user-info">
+                    <div class="user-name" id="userName">Loading...</div>
+                    <div class="user-role" id="userRole"></div>
+                </div>
+                <button class="btn-logout" id="logoutBtn" title="Logout">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Admin Panel (For Owner/Manager) -->
+        <section class="admin-panel" id="adminPanel" style="display: none;">
+            <h2 style="margin-bottom: 20px;"><i class="fas fa-tachometer-alt"></i> Admin Dashboard</h2>
+            
+            <div class="admin-tabs">
+                <button class="tab-btn active" data-tab="orders"><i class="fas fa-receipt"></i> Orders</button>
+                <button class="tab-btn" data-tab="vehicles"><i class="fas fa-car"></i> Vehicles</button>
+                <button class="tab-btn" data-tab="users"><i class="fas fa-users"></i> Users</button>
+                <button class="tab-btn" data-tab="analytics"><i class="fas fa-chart-bar"></i> Analytics</button>
+            </div>
+            
+            <div class="tab-content active" id="ordersTab">
+                <div class="table-controls">
+                    <input type="text" id="orderSearch" placeholder="Search orders..." style="width: 300px;">
+                    <select id="orderFilter">
+                        <option value="all">All Status</option>
+                        <option value="pending">Pending</option>
+                        <option value="approved">Approved</option>
+                        <option value="rejected">Rejected</option>
+                        <option value="delivered">Delivered</option>
+                    </select>
+                </div>
+                <div id="ordersTable"></div>
+            </div>
+            
+            <div class="tab-content" id="vehiclesTab">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3><i class="fas fa-car"></i> Vehicle Inventory</h3>
+                    <button class="btn btn-primary" id="addVehicleBtn">
+                        <i class="fas fa-plus"></i> Add Vehicle
+                    </button>
+                </div>
+                <div id="vehiclesTable"></div>
+            </div>
+            
+            <div class="tab-content" id="usersTab">
+                <h3><i class="fas fa-users"></i> User Management</h3>
+                <div id="usersTable"></div>
+            </div>
+            
+            <div class="tab-content" id="analyticsTab">
+                <h3><i class="fas fa-chart-bar"></i> Sales Analytics</h3>
+                <div id="analyticsChart"></div>
+            </div>
+        </section>
+
+        <!-- Purchase History (For Customers) -->
+        <section class="purchase-history" id="purchaseHistory" style="display: none;">
+            <h2 style="margin-bottom: 20px;"><i class="fas fa-history"></i> My Purchase History</h2>
+            <div id="historyTable" style="min-height: 200px;">
+                <div style="text-align: center; padding: 50px;">
+                    <i class="fas fa-history" style="font-size: 48px; color: var(--text-gray); margin-bottom: 20px;"></i>
+                    <p style="color: var(--text-gray);">No purchase history yet.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Dealership Interface -->
+        <div class="main-layout">
+            <!-- 3D Viewer Section -->
+            <section class="viewer-section">
+                <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+                    <div>
+                        <h2 style="font-family: 'Orbitron', sans-serif; font-size: 20px; display: flex; align-items: center; gap: 10px;">
+                            <i class="fas fa-cube"></i> GTA V Vehicle Viewer
+                        </h2>
+                    </div>
+                    <div class="vehicle-display-info">
+                        <div class="vehicle-name-display" id="vehicleNameDisplay">SELECT A VEHICLE</div>
+                        <div class="vehicle-price-display" id="vehiclePriceDisplay">$0</div>
+                    </div>
+                </div>
+                
+                <div id="vehicle3dViewer">
+                    <div class="loading-overlay" id="loadingOverlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(5,5,10,0.95); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10;">
+                        <div class="spinner" style="width: 60px; height: 60px; border: 4px solid rgba(255,68,0,0.1); border-top: 4px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                        <div style="color: var(--text-gray); font-size: 18px; margin-top: 15px;">Loading GTA V Vehicle Model...</div>
+                    </div>
+                    
+                    <div class="vehicle-info-display" id="vehicleInfoDisplay" style="display: none; position: absolute; bottom: 20px; left: 20px; background: rgba(0,0,0,0.7); backdrop-filter: blur(10px); border-radius: 12px; padding: 15px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; z-index: 5; border: 1px solid rgba(255,68,0,0.3);">
+                        <div class="info-item" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                            <span class="info-label" style="color: var(--text-gray); font-size: 12px;">Class:</span>
+                            <span class="info-value" id="infoClass" style="color: var(--text-light); font-weight: 600; font-size: 14px;">-</span>
+                        </div>
+                        <div class="info-item" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                            <span class="info-label" style="color: var(--text-gray); font-size: 12px;">Seats:</span>
+                            <span class="info-value" id="infoSeats" style="color: var(--text-light); font-weight: 600; font-size: 14px;">-</span>
+                        </div>
+                        <div class="info-item" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                            <span class="info-label" style="color: var(--text-gray); font-size: 12px;">Top Speed:</span>
+                            <span class="info-value" id="infoSpeed" style="color: var(--text-light); font-weight: 600; font-size: 14px;">-</span>
+                        </div>
+                        <div class="info-item" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                            <span class="info-label" style="color: var(--text-gray); font-size: 12px;">Acceleration:</span>
+                            <span class="info-value" id="infoAcceleration" style="color: var(--text-light); font-weight: 600; font-size: 14px;">-</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="viewer-controls" style="display: flex; justify-content: center; gap: 10px; margin-top: 20px;">
+                    <button class="control-btn active" id="rotateBtn" title="Auto Rotate" style="width: 50px; height: 50px; border-radius: 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: var(--text-light); font-size: 18px; cursor: pointer; transition: var(--transition); display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-play"></i>
+                    </button>
+                    <button class="control-btn" id="zoomInBtn" title="Zoom In">
+                        <i class="fas fa-search-plus"></i>
+                    </button>
+                    <button class="control-btn" id="zoomOutBtn" title="Zoom Out">
+                        <i class="fas fa-search-minus"></i>
+                    </button>
+                    <button class="control-btn" id="resetViewBtn" title="Reset View">
+                        <i class="fas fa-redo"></i>
+                    </button>
+                    <button class="control-btn" id="lightingBtn" title="Change Lighting">
+                        <i class="fas fa-lightbulb"></i>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <!-- Vehicle Selector -->
+                <section class="vehicle-selector">
+                    <h2 style="font-family: 'Orbitron', sans-serif; font-size: 20px; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-car-side"></i> GTA V Vehicles
+                    </h2>
+                    
+                    <div class="vehicle-categories" style="display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0;">
+                        <button class="category-btn active" data-category="all">All Vehicles</button>
+                        <button class="category-btn" data-category="sports">Sports</button>
+                        <button class="category-btn" data-category="sedan">Sedans</button>
+                        <button class="category-btn" data-category="suv">SUVs</button>
+                        <button class="category-btn" data-category="muscle">Muscle</button>
+                        <button class="category-btn" data-category="super">Super</button>
+                    </div>
+                    
+                    <div class="vehicle-list" id="vehicleList" style="max-height: 400px; overflow-y: auto; padding-right: 10px;">
+                        <!-- Vehicles will be loaded here -->
+                    </div>
+                </section>
+
+                <!-- Color Selector -->
+                <section class="color-selector">
+                    <h2 style="font-family: 'Orbitron', sans-serif; font-size: 20px; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-palette"></i> Vehicle Colors
+                    </h2>
+                    
+                    <div class="color-presets" id="colorPresets" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 20px 0;">
+                        <!-- Color presets will be generated here -->
+                    </div>
+                    
+                    <div class="color-custom">
+                        <div class="color-input-group" style="display: grid; grid-template-columns: 1fr 50px 80px; gap: 10px; align-items: center; margin-bottom: 15px;">
+                            <label style="font-size: 14px; color: var(--text-light); display: flex; align-items: center; gap: 8px;">
+                                <i class="fas fa-paint-brush"></i> Primary
+                            </label>
+                            <input type="color" id="primaryColorPicker" value="#ff4400" style="width: 50px; height: 40px; border-radius: 8px;">
+                            <input type="text" id="primaryColorHex" value="#ff4400" readonly style="padding: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-light);">
+                        </div>
+                        
+                        <div class="color-input-group" style="display: grid; grid-template-columns: 1fr 50px 80px; gap: 10px; align-items: center; margin-bottom: 15px;">
+                            <label style="font-size: 14px; color: var(--text-light); display: flex; align-items: center; gap: 8px;">
+                                <i class="fas fa-fill-drip"></i> Secondary
+                            </label>
+                            <input type="color" id="secondaryColorPicker" value="#111111">
+                            <input type="text" id="secondaryColorHex" value="#111111" readonly>
+                        </div>
+                        
+                        <div class="color-input-group" style="display: grid; grid-template-columns: 1fr 50px 80px; gap: 10px; align-items: center;">
+                            <label style="font-size: 14px; color: var(--text-light); display: flex; align-items: center; gap: 8px;">
+                                <i class="fas fa-tint"></i> Pearl
+                            </label>
+                            <input type="color" id="pearlColorPicker" value="#ff4400">
+                            <input type="text" id="pearlColorHex" value="#ff4400" readonly>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Order Form -->
+                <section class="buyer-details">
+                    <h2 style="font-family: 'Orbitron', sans-serif; font-size: 20px; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-user-circle"></i> Order Details
+                    </h2>
+                    
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <label for="specialRequests" style="display: block; margin-bottom: 8px; font-size: 14px; color: var(--text-light); display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-comment-alt"></i> Special Requests
+                        </label>
+                        <textarea id="specialRequests" class="form-control" rows="3" placeholder="Custom modifications, license plate, delivery preferences..." style="width: 100%; padding: 12px 15px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; color: var(--text-light); font-size: 14px;"></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label style="display: block; margin-bottom: 8px; font-size: 14px; color: var(--text-light);">
+                            <i class="fas fa-money-bill-wave"></i> Payment Method
+                        </label>
+                        <select id="paymentMethod" style="width: 100%; padding: 12px 15px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; color: var(--text-light); font-size: 14px;">
+                            <option value="bank">Bank Transfer</option>
+                            <option value="cash">Cash (In-Game)</option>
+                            <option value="crypto">Crypto</option>
+                        </select>
+                    </div>
+                </section>
+
+                <!-- Order Summary -->
+                <section class="order-summary">
+                    <h2 style="font-family: 'Orbitron', sans-serif; font-size: 20px; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-file-invoice-dollar"></i> Order Summary
+                    </h2>
+                    
+                    <div class="summary-item" style="display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                        <span class="summary-label" style="color: var(--text-gray); font-size: 14px;">Vehicle Model</span>
+                        <span class="summary-value" id="summaryVehicle" style="color: var(--text-light); font-weight: 600; font-size: 14px;">Not Selected</span>
+                    </div>
+                    
+                    <div class="summary-item" style="display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                        <span class="summary-label" style="color: var(--text-gray); font-size: 14px;">Base Price</span>
+                        <span class="summary-value" id="summaryPrice" style="color: var(--text-light); font-weight: 600; font-size: 14px;">$0</span>
+                    </div>
+                    
+                    <div class="summary-item" style="display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                        <span class="summary-label" style="color: var(--text-gray); font-size: 14px;">Colors</span>
+                        <div class="summary-value">
+                            <div style="display: flex; gap: 5px;">
+                                <div class="color-dot" id="summaryPrimaryDot" style="width: 20px; height: 20px; border-radius: 50%; background-color: #ff4400;"></div>
+                                <div class="color-dot" id="summarySecondaryDot" style="width: 20px; height: 20px; border-radius: 50%; background-color: #111111;"></div>
+                                <div class="color-dot" id="summaryPearlDot" style="width: 20px; height: 20px; border-radius: 50%; background-color: #ff4400;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="summary-item" style="display: flex; justify-content: space-between; align-items: center; padding: 15px 0;">
+                        <span class="summary-label" style="color: var(--text-light); font-size: 18px; font-weight: 600;">Total Amount</span>
+                        <span class="summary-value" id="summaryTotal" style="color: var(--primary); font-size: 28px; font-weight: 700;">$0</span>
+                    </div>
+                    
+                    <div class="action-buttons" style="display: flex; gap: 15px; margin-top: 30px;">
+                        <button class="btn btn-primary" id="submitOrderBtn" style="flex: 1;">
+                            <i class="fas fa-paper-plane"></i> Submit Order
+                        </button>
+                        <button class="btn" id="resetFormBtn" style="flex: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: var(--text-light);">
+                            <i class="fas fa-redo"></i> Reset
+                        </button>
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <!-- Countdown Timer -->
+        <section class="countdown-timer" id="countdownTimer">
+            <h2 style="font-family: 'Orbitron', sans-serif; font-size: 20px; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; justify-content: center;">
+                <i class="fas fa-clock"></i> Vehicle Reserved
+            </h2>
+            <p style="text-align: center; color: var(--text-gray); margin-bottom: 20px; line-height: 1.6;">
+                Your GTA V vehicle has been reserved!<br>
+                Dealership managers have been notified via Discord for approval.
+            </p>
+            
+            <div class="timer-display">
+                <div class="timer-unit" style="text-align: center;">
+                    <div class="timer-value" id="minutes">10</div>
+                    <div class="timer-label" style="font-size: 14px; color: var(--text-gray); margin-top: 5px;">Minutes</div>
+                </div>
+                <div class="timer-unit" style="text-align: center;">
+                    <div class="timer-value" id="seconds">00</div>
+                    <div class="timer-label" style="font-size: 14px; color: var(--text-gray); margin-top: 5px;">Seconds</div>
+                </div>
+            </div>
+            
+            <div class="action-buttons" style="display: flex; gap: 15px; margin-top: 30px;">
+                <button class="btn" id="cancelOrderBtn" style="flex: 1; background: rgba(255,71,87,0.1); border: 1px solid var(--danger); color: var(--danger);">
+                    <i class="fas fa-times"></i> Cancel Reservation
+                </button>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer style="background: var(--glass); backdrop-filter: blur(20px); border: 1px solid var(--glass-border); border-radius: 20px; padding: 25px; text-align: center; box-shadow: var(--shadow); margin-top: 30px;">
+            <p style="color: var(--text-gray); font-size: 14px; margin-bottom: 20px;">
+                © 2024 GTA V DEALERSHIP SYSTEM | Discord Integrated • Role-Based Access • Netlify Hosted
+            </p>
+            <div class="integration-badges" style="display: flex; justify-content: center; gap: 15px; flex-wrap: wrap;">
+                <div class="badge" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 10px 15px; font-size: 12px; display: flex; align-items: center; gap: 8px;">
+                    <i class="fab fa-discord"></i>
+                    <span>Discord OAuth2</span>
+                </div>
+                <div class="badge" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 10px 15px; font-size: 12px; display: flex; align-items: center; gap: 8px;">
+                    <i class="fas fa-shield-alt"></i>
+                    <span>Role-Based Access</span>
+                </div>
+                <div class="badge" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 10px 15px; font-size: 12px; display: flex; align-items: center; gap: 8px;">
+                    <i class="fab fa-netlify"></i>
+                    <span>Netlify Hosted</span>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Status Message -->
+    <div class="status-message" id="statusMessage"></div>
+
+    <!-- Main JavaScript -->
+    <script>
+        // ==============================
+        // APPLICATION CONFIGURATION
+        // ==============================
+        
+        // Discord OAuth Configuration
+        const DISCORD_CLIENT_ID = '1449863144712179885'; // Set in Netlify environment variables
+        const REDIRECT_URI = window.location.origin + '/auth-callback.html';
+        const API_BASE_URL = window.location.origin + '/.netlify/functions';
+        
+        // Discord OAuth URL
+        const DISCORD_OAUTH_URL = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=identify%20guilds`;
+        
+        // Color definitions matching CSS variables
+        const colors = {
+            primary: '#ff4400',
+            primaryDark: '#cc3300',
+            secondary: '#111111',
+            accent: '#5865F2',
+            discordBlurple: '#5865F2',
+            discordGreen: '#57F287',
+            discordYellow: '#FEE75C',
+            discordRed: '#ED4245',
+            textLight: '#ffffff',
+            textGray: '#b0b0c0',
+            success: '#00ff88',
+            warning: '#ffb142',
+            danger: '#ff4757',
+            darkBg: '#0a0a0f',
+            glass: 'rgba(15, 15, 20, 0.9)',
+            glassBorder: 'rgba(255, 68, 0, 0.3)'
+        };
+        
+        // Application State
+        let currentUser = null;
+        let userRole = null;
+        let authToken = null;
+        let vehicles = [];
+        let selectedVehicle = null;
+        let primaryColor = '#ff4400';
+        let secondaryColor = '#111111';
+        let pearlColor = '#ff4400';
+        let countdownInterval = null;
+        let remainingTime = 600; // 10 minutes in seconds
+        
+        // Three.js Variables
+        let scene, camera, renderer, controls, currentModel;
+        let isRotating = true;
+        
+        // ==============================
+        // DISCORD AUTHENTICATION
+        // ==============================
+        
+        // Initialize Discord Login
+        function initDiscordLogin() {
+            document.getElementById('discordLoginBtn').addEventListener('click', () => {
+                window.location.href = DISCORD_OAUTH_URL;
+            });
+        }
+        
+        // Check if user is already authenticated
+        async function checkAuth() {
+            const token = localStorage.getItem('gta_dealership_token');
+            const userData = localStorage.getItem('gta_dealership_user');
+            
+            if (!token || !userData) {
+                return false;
+            }
+            
+            try {
+                // Verify token with backend
+                const response = await fetch(`${API_BASE_URL}/verify-auth`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    currentUser = JSON.parse(userData);
+                    userRole = data.role;
+                    authToken = token;
+                    
+                    // Show main application
+                    showMainApplication();
+                    return true;
+                } else {
+                    // Token invalid, clear storage
+                    localStorage.removeItem('gta_dealership_token');
+                    localStorage.removeItem('gta_dealership_user');
+                    return false;
+                }
+            } catch (error) {
+                console.error('Auth check failed:', error);
+                return false;
+            }
+        }
+        
+        // Show main application after login
+        function showMainApplication() {
+            document.getElementById('discordLoginSection').style.display = 'none';
+            document.getElementById('mainApp').style.display = 'block';
+            
+            // Update user profile
+            updateUserProfile();
+            
+            // Setup role-based UI
+            setupRoleBasedUI();
+            
+            // Initialize 3D viewer and load vehicles
+            init3DViewer();
+            loadVehicles();
+            initColorPalette();
+            setupEventListeners();
+        }
+        
+        // Update user profile display
+        function updateUserProfile() {
+            if (!currentUser) return;
+            
+            const avatarEl = document.getElementById('userAvatar');
+            const nameEl = document.getElementById('userName');
+            const roleEl = document.getElementById('userRole');
+            
+            // Set avatar
+            if (currentUser.avatar) {
+                avatarEl.innerHTML = '';
+                avatarEl.style.backgroundImage = `url(https://cdn.discordapp.com/avatars/${currentUser.id}/${currentUser.avatar}.png)`;
+                avatarEl.style.backgroundSize = 'cover';
+                avatarEl.style.backgroundPosition = 'center';
+            }
+            
+            // Set name and role
+            nameEl.textContent = currentUser.username;
+            roleEl.textContent = userRole.charAt(0).toUpperCase() + userRole.slice(1);
+            
+            // Set role color using JavaScript colors object
+            switch(userRole.toLowerCase()) {
+                case 'owner':
+                    roleEl.style.color = '#ffd700';
+                    break;
+                case 'manager':
+                    roleEl.style.color = '#00a8ff';
+                    break;
+                case 'customer':
+                    roleEl.style.color = '#00ff88';
+                    break;
+                default:
+                    roleEl.style.color = colors.textGray;
+            }
+        }
+        
+        // Setup UI based on user role
+        function setupRoleBasedUI() {
+            const adminPanel = document.getElementById('adminPanel');
+            const purchaseHistory = document.getElementById('purchaseHistory');
+            
+            switch(userRole.toLowerCase()) {
+                case 'owner':
+                case 'manager':
+                    adminPanel.style.display = 'block';
+                    purchaseHistory.style.display = 'block';
+                    loadAdminData();
+                    loadPurchaseHistory();
+                    break;
+                case 'customer':
+                    adminPanel.style.display = 'none';
+                    purchaseHistory.style.display = 'block';
+                    loadPurchaseHistory();
+                    break;
+                default:
+                    adminPanel.style.display = 'none';
+                    purchaseHistory.style.display = 'block';
+            }
+        }
+        
+        // Logout function
+        function logout() {
+            localStorage.removeItem('gta_dealership_token');
+            localStorage.removeItem('gta_dealership_user');
+            window.location.reload();
+        }
+        
+        // ==============================
+        // PURCHASE HISTORY
+        // ==============================
+        
+        // Load user's purchase history
+        async function loadPurchaseHistory() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/purchase-history`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const history = await response.json();
+                    renderPurchaseHistory(history);
+                }
+            } catch (error) {
+                console.error('Failed to load purchase history:', error);
+            }
+        }
+        
+        // Render purchase history table
+        function renderPurchaseHistory(history) {
+            const tableEl = document.getElementById('historyTable');
+            
+            if (!history || history.length === 0) {
+                tableEl.innerHTML = `
+                    <div style="text-align: center; padding: 50px;">
+                        <i class="fas fa-history" style="font-size: 48px; color: ${colors.textGray}; margin-bottom: 20px;"></i>
+                        <p style="color: ${colors.textGray};">No purchase history yet.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Vehicle</th>
+                            <th>Color</th>
+                            <th>Price</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            history.forEach(order => {
+                const date = new Date(order.created_at).toLocaleDateString();
+                const statusClass = order.status || 'pending';
+                
+                html += `
+                    <tr>
+                        <td>${date}</td>
+                        <td><strong>${order.vehicle_name}</strong></td>
+                        <td>
+                            <div style="display: flex; gap: 5px;">
+                                <div style="width: 20px; height: 20px; border-radius: 50%; background: ${order.primary_color || '#ff4400'};"></div>
+                                <div style="width: 20px; height: 20px; border-radius: 50%; background: ${order.secondary_color || '#111111'};"></div>
+                            </div>
+                        </td>
+                        <td>$${order.price.toLocaleString()}</td>
+                        <td><span class="status-badge status-${statusClass}">${statusClass}</span></td>
+                    </tr>
+                `;
+            });
+            
+            html += '</tbody></table>';
+            tableEl.innerHTML = html;
+        }
+        
+        // ==============================
+        // ADMIN FUNCTIONS
+        // ==============================
+        
+        // Load admin data
+        async function loadAdminData() {
+            if (userRole !== 'owner' && userRole !== 'manager') return;
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/admin/orders`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const orders = await response.json();
+                    renderOrdersTable(orders);
+                }
+            } catch (error) {
+                console.error('Failed to load admin data:', error);
+            }
+        }
+        
+        // Render orders table for admin
+        function renderOrdersTable(orders) {
+            const tableEl = document.getElementById('ordersTable');
+            
+            if (!orders || orders.length === 0) {
+                tableEl.innerHTML = '<p style="text-align: center; color: ' + colors.textGray + ';">No orders found.</p>';
+                return;
+            }
+            
+            let html = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Order ID</th>
+                            <th>Customer</th>
+                            <th>Vehicle</th>
+                            <th>Price</th>
+                            <th>Status</th>
+                            <th>Date</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            orders.forEach(order => {
+                const date = new Date(order.created_at).toLocaleDateString();
+                const statusClass = order.status || 'pending';
+                
+                html += `
+                    <tr>
+                        <td>${order.id.slice(0, 8)}...</td>
+                        <td>${order.customer_name || 'Unknown'}</td>
+                        <td>${order.vehicle_name}</td>
+                        <td>$${order.price.toLocaleString()}</td>
+                        <td><span class="status-badge status-${statusClass}">${statusClass}</span></td>
+                        <td>${date}</td>
+                        <td>
+                            <div style="display: flex; gap: 5px;">
+                                ${userRole === 'owner' || userRole === 'manager' ? `
+                                    <button class="btn-approve" data-id="${order.id}" title="Approve" style="background: rgba(0,255,136,0.2); color: ${colors.success}; border: none; border-radius: 5px; padding: 5px 10px; cursor: pointer;">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                    <button class="btn-reject" data-id="${order.id}" title="Reject" style="background: rgba(255,71,87,0.2); color: ${colors.danger}; border: none; border-radius: 5px; padding: 5px 10px; cursor: pointer;">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                ` : ''}
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            html += '</tbody></table>';
+            tableEl.innerHTML = html;
+            
+            // Add event listeners to action buttons
+            document.querySelectorAll('.btn-approve').forEach(btn => {
+                btn.addEventListener('click', () => updateOrderStatus(btn.dataset.id, 'approved'));
+            });
+            
+            document.querySelectorAll('.btn-reject').forEach(btn => {
+                btn.addEventListener('click', () => updateOrderStatus(btn.dataset.id, 'rejected'));
+            });
+        }
+        
+        // Update order status
+        async function updateOrderStatus(orderId, status) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/admin/update-order`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ orderId, status })
+                });
+                
+                if (response.ok) {
+                    showMessage('success', `Order ${status} successfully!`);
+                    loadAdminData();
+                    
+                    // Send Discord notification
+                    sendDiscordNotification(orderId, status);
+                }
+            } catch (error) {
+                console.error('Failed to update order:', error);
+                showMessage('error', 'Failed to update order');
+            }
+        }
+        
+        // ==============================
+        // VEHICLE MANAGEMENT
+        // ==============================
+        
+        // Load vehicles from backend
+        async function loadVehicles() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/vehicles`);
+                
+                if (response.ok) {
+                    vehicles = await response.json();
+                    renderVehicleList();
+                    
+                    // Select first vehicle by default
+                    if (vehicles.length > 0) {
+                        selectVehicle(vehicles[0]);
+                    }
+                } else {
+                    // Fallback to default vehicles
+                    loadDefaultVehicles();
+                }
+            } catch (error) {
+                console.error('Failed to load vehicles:', error);
+                loadDefaultVehicles();
+            }
+        }
+        
+        // Default vehicles (fallback)
+        function loadDefaultVehicles() {
+            vehicles = [
+                {
+                    id: 1,
+                    model: "sultan",
+                    name: "Karin Sultan",
+                    price: 250000,
+                    class: "Sports",
+                    category: "sedan",
+                    seats: 4,
+                    topSpeed: "210 km/h",
+                    acceleration: "5.2s",
+                    description: "Classic Japanese sports sedan",
+                    stock: 5
+                },
+                {
+                    id: 2,
+                    model: "buffalo",
+                    name: "Bravado Buffalo",
+                    price: 350000,
+                    class: "Muscle",
+                    category: "muscle",
+                    seats: 4,
+                    topSpeed: "230 km/h",
+                    acceleration: "4.8s",
+                    description: "Modern American muscle car",
+                    stock: 3
+                },
+                {
+                    id: 3,
+                    model: "comet2",
+                    name: "Pfister Comet",
+                    price: 450000,
+                    class: "Sports",
+                    category: "sports",
+                    seats: 2,
+                    topSpeed: "240 km/h",
+                    acceleration: "4.2s",
+                    description: "German sports car",
+                    stock: 2
+                }
+            ];
+            
+            renderVehicleList();
+            
+            if (vehicles.length > 0) {
+                selectVehicle(vehicles[0]);
+            }
+        }
+        
+        // Render vehicle list
+        function renderVehicleList() {
+            const vehicleList = document.getElementById('vehicleList');
+            vehicleList.innerHTML = '';
+            
+            vehicles.forEach(vehicle => {
+                const vehicleItem = document.createElement('div');
+                vehicleItem.className = 'vehicle-item';
+                vehicleItem.dataset.id = vehicle.id;
+                vehicleItem.dataset.category = vehicle.category;
+                
+                let icon = 'fas fa-car';
+                if (vehicle.category === "suv") icon = 'fas fa-truck';
+                if (vehicle.category === "super") icon = 'fas fa-bolt';
+                if (vehicle.category === "muscle") icon = 'fas fa-horse-head';
+                if (vehicle.category === "sports") icon = 'fas fa-tachometer-alt';
+                
+                vehicleItem.innerHTML = `
+                    <div style="display: flex; gap: 15px; align-items: center; padding: 15px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 15px; margin-bottom: 10px; cursor: pointer;">
+                        <div style="width: 50px; height: 50px; background: rgba(255,68,0,0.1); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; color: ${colors.primary};">
+                            <i class="${icon}"></i>
+                        </div>
+                        <div style="flex: 1;">
+                            <div style="font-size: 16px; font-weight: 600; margin-bottom: 5px;">${vehicle.name}</div>
+                            <div style="font-size: 18px; font-weight: 700; color: ${colors.primary}; margin-bottom: 10px;">$${vehicle.price.toLocaleString()}</div>
+                            <div style="display: flex; gap: 15px; font-size: 12px; color: ${colors.textGray};">
+                                <div><i class="fas fa-users"></i> ${vehicle.seats} seats</div>
+                                <div><i class="fas fa-tachometer-alt"></i> ${vehicle.topSpeed}</div>
+                                <div><i class="fas fa-bolt"></i> ${vehicle.acceleration}</div>
+                            </div>
+                            ${vehicle.stock !== undefined ? `<div style="margin-top: 5px; font-size: 11px; color: ${vehicle.stock > 0 ? colors.success : colors.danger};">Stock: ${vehicle.stock}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+                
+                vehicleItem.addEventListener('click', () => selectVehicle(vehicle));
+                vehicleList.appendChild(vehicleItem);
+            });
+            
+            setupCategoryFiltering();
+        }
+        
+        // Select a vehicle
+        function selectVehicle(vehicle) {
+            selectedVehicle = vehicle;
+            
+            // Update UI
+            document.querySelectorAll('.vehicle-item').forEach(item => {
+                item.style.background = 'rgba(255,255,255,0.05)';
+            });
+            
+            // Update display
+            document.getElementById('vehicleNameDisplay').textContent = vehicle.name;
+            document.getElementById('vehiclePriceDisplay').textContent = `$${vehicle.price.toLocaleString()}`;
+            
+            // Update vehicle info
+            document.getElementById('infoClass').textContent = vehicle.class;
+            document.getElementById('infoSeats').textContent = vehicle.seats;
+            document.getElementById('infoSpeed').textContent = vehicle.topSpeed;
+            document.getElementById('infoAcceleration').textContent = vehicle.acceleration;
+            document.getElementById('vehicleInfoDisplay').style.display = 'grid';
+            
+            // Update order summary
+            updateOrderSummary();
+            
+            // Load 3D model (simplified for this example)
+            loadVehicleModel(vehicle);
+        }
+        
+        // Setup category filtering
+        function setupCategoryFiltering() {
+            document.querySelectorAll('.category-btn').forEach(button => {
+                button.addEventListener('click', function() {
+                    document.querySelectorAll('.category-btn').forEach(btn => {
+                        btn.style.background = 'rgba(255,255,255,0.05)';
+                        btn.style.borderColor = 'rgba(255,255,255,0.1)';
+                    });
+                    
+                    this.style.background = colors.primary;
+                    this.style.borderColor = colors.primary;
+                    
+                    const category = this.dataset.category;
+                    filterVehicles(category);
+                });
+            });
+        }
+        
+        // Filter vehicles by category
+        function filterVehicles(category) {
+            const vehicleItems = document.querySelectorAll('.vehicle-item');
+            
+            vehicleItems.forEach(item => {
+                if (category === 'all' || item.dataset.category === category) {
+                    item.style.display = 'block';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        }
+        
+        // ==============================
+        // COLOR MANAGEMENT
+        // ==============================
+        
+        // Initialize color palette
+        function initColorPalette() {
+            const gtaColors = [
+                { name: "Metallic Red", value: "#ff0000", type: "primary" },
+                { name: "Metallic Blue", value: "#0066cc", type: "primary" },
+                { name: "Metallic Black", value: "#0a0a0a", type: "primary" },
+                { name: "Metallic White", value: "#ffffff", type: "primary" },
+                { name: "Metallic Green", value: "#00aa55", type: "primary" },
+                { name: "Matte Black", value: "#111111", type: "secondary" },
+                { name: "Matte Gray", value: "#444444", type: "secondary" },
+                { name: "Chrome", value: "#aaaaaa", type: "secondary" }
+            ];
+            
+            const colorPresets = document.getElementById('colorPresets');
+            colorPresets.innerHTML = '';
+            
+            gtaColors.forEach((color, index) => {
+                const colorPreset = document.createElement('div');
+                colorPreset.className = 'color-preset';
+                colorPreset.style.background = color.value;
+                colorPreset.style.width = '40px';
+                colorPreset.style.height = '40px';
+                colorPreset.style.borderRadius = '10px';
+                colorPreset.style.cursor = 'pointer';
+                colorPreset.title = color.name;
+                
+                if (index === 0) {
+                    colorPreset.style.border = '2px solid white';
+                    colorPreset.style.boxShadow = '0 0 10px rgba(255,255,255,0.5)';
+                }
+                
+                colorPreset.addEventListener('click', function() {
+                    document.querySelectorAll('.color-preset').forEach(p => {
+                        p.style.border = 'none';
+                        p.style.boxShadow = 'none';
+                    });
+                    
+                    this.style.border = '2px solid white';
+                    this.style.boxShadow = '0 0 10px rgba(255,255,255,0.5)';
+                    
+                    if (color.type === 'primary') {
+                        setPrimaryColor(color.value);
+                    } else {
+                        setSecondaryColor(color.value);
+                    }
+                });
+                
+                colorPresets.appendChild(colorPreset);
+            });
+            
+            // Setup color pickers
+            document.getElementById('primaryColorPicker').addEventListener('input', function() {
+                setPrimaryColor(this.value);
+            });
+            
+            document.getElementById('secondaryColorPicker').addEventListener('input', function() {
+                setSecondaryColor(this.value);
+            });
+            
+            document.getElementById('pearlColorPicker').addEventListener('input', function() {
+                setPearlColor(this.value);
+            });
+        }
+        
+        // Set primary color
+        function setPrimaryColor(color) {
+            primaryColor = color;
+            document.getElementById('primaryColorPicker').value = color;
+            document.getElementById('primaryColorHex').value = color;
+            document.getElementById('summaryPrimaryDot').style.background = color;
+            updateOrderSummary();
+        }
+        
+        // Set secondary color
+        function setSecondaryColor(color) {
+            secondaryColor = color;
+            document.getElementById('secondaryColorPicker').value = color;
+            document.getElementById('secondaryColorHex').value = color;
+            document.getElementById('summarySecondaryDot').style.background = color;
+            updateOrderSummary();
+        }
+        
+        // Set pearl color
+        function setPearlColor(color) {
+            pearlColor = color;
+            document.getElementById('pearlColorPicker').value = color;
+            document.getElementById('pearlColorHex').value = color;
+            document.getElementById('summaryPearlDot').style.background = color;
+            updateOrderSummary();
+        }
+        
+        // ==============================
+        // ORDER MANAGEMENT
+        // ==============================
+        
+        // Update order summary
+        function updateOrderSummary() {
+            if (selectedVehicle) {
+                document.getElementById('summaryVehicle').textContent = selectedVehicle.name;
+                document.getElementById('summaryPrice').textContent = `$${selectedVehicle.price.toLocaleString()}`;
+                document.getElementById('summaryTotal').textContent = `$${selectedVehicle.price.toLocaleString()}`;
+                document.getElementById('summaryTotal').style.color = colors.primary;
+            }
+        }
+        
+        // Submit order
+        async function submitOrder() {
+            if (!selectedVehicle) {
+                showMessage('error', 'Please select a vehicle first');
+                return;
+            }
+            
+            if (!currentUser) {
+                showMessage('error', 'Please login first');
+                return;
+            }
+            
+            const specialRequests = document.getElementById('specialRequests').value;
+            const paymentMethod = document.getElementById('paymentMethod').value;
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/submit-order`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        vehicleId: selectedVehicle.id,
+                        vehicleName: selectedVehicle.name,
+                        price: selectedVehicle.price,
+                        primaryColor: primaryColor,
+                        secondaryColor: secondaryColor,
+                        pearlColor: pearlColor,
+                        specialRequests: specialRequests,
+                        paymentMethod: paymentMethod
+                    })
+                });
+                
+                if (response.ok) {
+                    showMessage('success', 'Order submitted successfully!');
+                    
+                    // Show countdown timer
+                    document.getElementById('countdownTimer').style.display = 'block';
+                    startCountdown();
+                    
+                    // Disable submit button
+                    document.getElementById('submitOrderBtn').disabled = true;
+                    
+                    // Send Discord notification
+                    sendOrderNotification();
+                    
+                    // Refresh purchase history
+                    loadPurchaseHistory();
+                } else {
+                    showMessage('error', 'Failed to submit order');
+                }
+            } catch (error) {
+                console.error('Order submission error:', error);
+                showMessage('error', 'Network error. Please try again.');
+            }
+        }
+        
+        // Start countdown timer
+        function startCountdown() {
+            remainingTime = 600; // 10 minutes
+            
+            updateTimerDisplay();
+            
+            countdownInterval = setInterval(() => {
+                remainingTime--;
+                updateTimerDisplay();
+                
+                if (remainingTime <= 0) {
+                    clearInterval(countdownInterval);
+                    document.getElementById('submitOrderBtn').disabled = false;
+                    document.getElementById('countdownTimer').style.display = 'none';
+                    showMessage('warning', 'Reservation expired');
+                }
+            }, 1000);
+        }
+        
+        // Update timer display
+        function updateTimerDisplay() {
+            const minutes = Math.floor(remainingTime / 60);
+            const seconds = remainingTime % 60;
+            
+            document.getElementById('minutes').textContent = minutes.toString().padStart(2, '0');
+            document.getElementById('seconds').textContent = seconds.toString().padStart(2, '0');
+        }
+        
+        // Cancel order
+        function cancelOrder() {
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+            }
+            
+            document.getElementById('countdownTimer').style.display = 'none';
+            document.getElementById('submitOrderBtn').disabled = false;
+            showMessage('info', 'Order cancelled');
+        }
+        
+        // ==============================
+        // DISCORD NOTIFICATIONS
+        // ==============================
+        
+        // Send order notification to Discord
+        async function sendOrderNotification() {
+            try {
+                await fetch(`${API_BASE_URL}/discord-notify`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        type: 'new_order',
+                        user: currentUser.username,
+                        vehicle: selectedVehicle.name,
+                        price: selectedVehicle.price,
+                        colors: { primary: primaryColor, secondary: secondaryColor }
+                    })
+                });
+            } catch (error) {
+                console.error('Discord notification failed:', error);
+            }
+        }
+        
+        // Send order status update notification
+        async function sendDiscordNotification(orderId, status) {
+            try {
+                await fetch(`${API_BASE_URL}/discord-notify`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        type: 'order_update',
+                        orderId: orderId,
+                        status: status
+                    })
+                });
+            } catch (error) {
+                console.error('Discord notification failed:', error);
+            }
+        }
+        
+        // ==============================
+        // 3D VIEWER (Simplified)
+        // ==============================
+        
+        // Initialize 3D viewer
+        function init3DViewer() {
+            const container = document.getElementById('vehicle3dViewer');
+            
+            // Create scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x050510);
+            
+            // Create camera
+            camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+            camera.position.set(0, 2, 8);
+            
+            // Create renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.shadowMap.enabled = true;
+            container.appendChild(renderer.domElement);
+            
+            // Add lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(10, 20, 15);
+            scene.add(directionalLight);
+            
+            // Add floor
+            const floorGeometry = new THREE.PlaneGeometry(50, 50);
+            const floorMaterial = new THREE.MeshPhysicalMaterial({ 
+                color: 0x111111,
+                metalness: 0.9,
+                roughness: 0.05
+            });
+            const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+            floor.rotation.x = -Math.PI / 2;
+            floor.position.y = -1;
+            scene.add(floor);
+            
+            // Start animation loop
+            animate();
+            
+            // Handle window resize
+            window.addEventListener('resize', onWindowResize);
+        }
+        
+        // Load vehicle model (placeholder)
+        function loadVehicleModel(vehicle) {
+            // Remove existing model
+            if (currentModel) {
+                scene.remove(currentModel);
+            }
+            
+            // Create placeholder model based on vehicle type
+            let geometry;
+            
+            switch(vehicle.category) {
+                case 'suv':
+                    geometry = new THREE.BoxGeometry(2.5, 1.5, 5);
+                    break;
+                case 'super':
+                    geometry = new THREE.BoxGeometry(2, 0.8, 4.5);
+                    break;
+                case 'muscle':
+                    geometry = new THREE.BoxGeometry(2.3, 1.2, 5);
+                    break;
+                default:
+                    geometry = new THREE.BoxGeometry(2, 1.2, 4);
+            }
+            
+            const material = new THREE.MeshPhysicalMaterial({ 
+                color: primaryColor,
+                metalness: 0.7,
+                roughness: 0.3
+            });
+            
+            currentModel = new THREE.Mesh(geometry, material);
+            currentModel.position.y = 0;
+            scene.add(currentModel);
+            
+            // Hide loading overlay
+            document.getElementById('loadingOverlay').style.display = 'none';
+        }
+        
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            if (currentModel && isRotating) {
+                currentModel.rotation.y += 0.01;
+            }
+            
+            if (renderer && scene && camera) {
+                renderer.render(scene, camera);
+            }
+        }
+        
+        // Handle window resize
+        function onWindowResize() {
+            const container = document.getElementById('vehicle3dViewer');
+            if (container && camera && renderer) {
+                camera.aspect = container.clientWidth / container.clientHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(container.clientWidth, container.clientHeight);
+            }
+        }
+        
+        // ==============================
+        // EVENT LISTENERS
+        // ==============================
+        
+        // Setup event listeners
+        function setupEventListeners() {
+            // Logout button
+            document.getElementById('logoutBtn').addEventListener('click', logout);
+            
+            // Order submission
+            document.getElementById('submitOrderBtn').addEventListener('click', submitOrder);
+            
+            // Reset form
+            document.getElementById('resetFormBtn').addEventListener('click', () => {
+                document.getElementById('specialRequests').value = '';
+                showMessage('info', 'Form reset');
+            });
+            
+            // Cancel order
+            document.getElementById('cancelOrderBtn').addEventListener('click', cancelOrder);
+            
+            // Viewer controls
+            document.getElementById('rotateBtn').addEventListener('click', function() {
+                isRotating = !isRotating;
+                this.innerHTML = isRotating ? '<i class="fas fa-pause"></i>' : '<i class="fas fa-play"></i>';
+            });
+            
+            document.getElementById('zoomInBtn').addEventListener('click', () => {
+                if (camera) camera.position.z -= 1;
+            });
+            
+            document.getElementById('zoomOutBtn').addEventListener('click', () => {
+                if (camera) camera.position.z += 1;
+            });
+            
+            document.getElementById('resetViewBtn').addEventListener('click', () => {
+                if (camera) camera.position.set(0, 2, 8);
+            });
+            
+            document.getElementById('lightingBtn').addEventListener('click', () => {
+                // Toggle lighting (simplified)
+                scene.children.forEach(child => {
+                    if (child.isLight) {
+                        child.intensity = child.intensity === 0.6 ? 1.0 : 0.6;
+                    }
+                });
+            });
+            
+            // Admin tabs
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.tab-btn').forEach(b => {
+                        b.classList.remove('active');
+                    });
+                    document.querySelectorAll('.tab-content').forEach(c => {
+                        c.classList.remove('active');
+                    });
+                    
+                    this.classList.add('active');
+                    document.getElementById(this.dataset.tab + 'Tab').classList.add('active');
+                });
+            });
+            
+            // Add vehicle button
+            document.getElementById('addVehicleBtn')?.addEventListener('click', () => {
+                showMessage('info', 'Add vehicle feature coming soon!');
+            });
+        }
+        
+        // ==============================
+        // UTILITY FUNCTIONS
+        // ==============================
+        
+        // Show status message
+        function showMessage(type, text) {
+            const messageEl = document.getElementById('statusMessage');
+            messageEl.className = `status-message status-${type}`;
+            
+            let icon, color;
+            switch(type) {
+                case 'success':
+                    icon = 'check-circle';
+                    color = colors.success;
+                    break;
+                case 'error':
+                    icon = 'exclamation-circle';
+                    color = colors.danger;
+                    break;
+                default:
+                    icon = 'info-circle';
+                    color = colors.accent;
+            }
+            
+            messageEl.innerHTML = `
+                <i class="fas fa-${icon}" style="font-size: 28px; color: ${color};"></i>
+                <div>
+                    <strong style="font-size: 18px;">${type.charAt(0).toUpperCase() + type.slice(1)}</strong><br>
+                    <span style="font-size: 14px; color: ${colors.textGray};">${text}</span>
+                </div>
+            `;
+            messageEl.style.display = 'flex';
+            
+            setTimeout(() => {
+                messageEl.style.display = 'none';
+            }, 5000);
+        }
+        
+        // ==============================
+        // INITIALIZATION
+        // ==============================
+        
+        // Initialize application
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Check URL for Discord OAuth callback
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get('code');
+            
+            if (code) {
+                // Handle OAuth callback
+                await handleOAuthCallback(code);
+            } else {
+                // Initialize Discord login
+                initDiscordLogin();
+                
+                // Check if user is already authenticated
+                const isAuthenticated = await checkAuth();
+                
+                if (!isAuthenticated) {
+                    document.getElementById('discordLoginSection').style.display = 'flex';
+                }
+            }
+            
+            // Setup logout button
+            document.getElementById('logoutBtn')?.addEventListener('click', logout);
+        });
+        
+        // Handle OAuth callback
+        async function handleOAuthCallback(code) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/discord-auth`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ code })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    // Store token and user data
+                    localStorage.setItem('gta_dealership_token', data.token);
+                    localStorage.setItem('gta_dealership_user', JSON.stringify(data.user));
+                    
+                    // Remove code from URL
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                    
+                    // Reload to show authenticated state
+                    window.location.reload();
+                } else {
+                    showMessage('error', 'Authentication failed');
+                    setTimeout(() => {
+                        window.location.href = '/';
+                    }, 3000);
+                }
+            } catch (error) {
+                console.error('OAuth error:', error);
+                showMessage('error', 'Network error during authentication');
+            }
+        }
+    </script>
+</body>
+</html>
